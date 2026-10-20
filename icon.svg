@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Model billing">
+  <defs>
+    <linearGradient id="mb-coin" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f8a8a"/>
+      <stop offset="1" stop-color="#185a9d"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#mb-coin)"/>
+  <circle cx="32" cy="32" r="19" fill="none" stroke="#ffffff" stroke-opacity=".9" stroke-width="2.4"/>
+  <path d="M25 23l7 9 7-9" fill="none" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 32v11M25.5 31.5h13M25.5 36.5h13" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M18 47.5h8M28 47.5h8M38 47.5h8" stroke="#ffffff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+</svg>

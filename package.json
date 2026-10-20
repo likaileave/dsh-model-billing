@@ -1,0 +1,60 @@
+{
+  "name": "dsh-model-billing",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Reorder models in the DSH composer picker, store three per-million-token prices, and estimate per-turn and session cost with built-in DeepSeek peak/off-peak rates.",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "model-picker",
+    "cost",
+    "billing",
+    "deepseek"
+  ],
+  "license": "MIT",
+  "author": "likaileave",
+  "homepage": "https://github.com/likaileave/dsh-model-billing#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/likaileave/dsh-model-billing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/likaileave/dsh-model-billing/issues"
+  },
+  "icon": "./icon.svg",
+  "meta": {
+    "title": "模型与费用 / Models & Cost",
+    "description": "调整模型顺序，内置 DeepSeek 官方峰谷价，填写其他模型的每百万 tokens 三档价格，并按会话日志估算逐轮和本会话费用。"
+  },
+  "exports": {
+    ".": "./host.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "host.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/host.test.mjs test/routes.test.mjs",
+    "check": "node --check host.js && node --check client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "模型与费用",
+    "description": "调整已配置模型的顺序，内置 DeepSeek 官方峰谷价，按每百万 tokens 填写其他模型价格，并估算非 DeepSeek 模型的逐轮和本会话费用。"
+  }
+}
