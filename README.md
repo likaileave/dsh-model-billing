@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.svg" width="72" height="72" alt="dsh-model-billing icon">
+  <img src="https://unpkg.com/dsh-model-billing@0.1.0/icon.svg" width="72" height="72" alt="dsh-model-billing icon">
 </p>
 
 <h1 align="center">dsh-model-billing</h1>
@@ -15,6 +15,10 @@
 <p align="center">
   <a href="#中文">中文</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">Changelog</a>
 </p>
+
+> **AI 生成声明**：本项目的代码、文档和图标由 AI 辅助生成，并经人工审核、修改和测试；发布者对最终发布内容负责。
+>
+> **AI-generated notice**: The code, documentation, and icon in this project were generated with AI assistance, then reviewed, modified, and tested by a human; the publisher is responsible for the released content.
 
 ## 中文
 
