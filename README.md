@@ -7,6 +7,12 @@
 <p align="center">为 DeepSeek Harness Web GUI 调整模型顺序，并按轮次估算模型费用。</p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/dsh-model-billing"><img alt="npm version" src="https://img.shields.io/npm/v/dsh-model-billing.svg"></a>
+  <a href="https://github.com/likaileave/dsh-model-billing/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/likaileave/dsh-model-billing"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/likaileave/dsh-model-billing"></a>
+</p>
+
+<p align="center">
   <a href="#中文">中文</a> · <a href="#english">English</a> · <a href="CHANGELOG.md">Changelog</a>
 </p>
 
@@ -56,7 +62,13 @@ DeepSeek 价格只读，不写入本地价格配置。官网调价或节假日�
 
 ### 安装
 
-**从 dsh-market 安装（上架后）**
+**npm**
+
+```sh
+dsh plugin --profile desktop add dsh-model-billing
+```
+
+**从 dsh-market 安装**
 
 在 dsh-market 中搜索 `dsh-model-billing` 安装。
 
@@ -79,6 +91,15 @@ dsh plugin --profile desktop add ./dsh-model-billing
 ```
 
 安装或更新后刷新 Web 页面。设置页位于“模型与费用”。
+
+### 发布
+
+npm 包和 GitHub Release 使用相同版本号，两个渠道分别发布：
+
+- npm：<https://www.npmjs.com/package/dsh-model-billing>
+- GitHub Releases：<https://github.com/likaileave/dsh-model-billing/releases>
+
+两个渠道是并列的发布渠道，不承诺自动同步。
 
 ### 数据位置
 
@@ -141,13 +162,25 @@ The plugin ships **no third-party price defaults**. Enter your provider's actual
 
 ### Install
 
-From dsh-market after listing, or manually from a [Release](https://github.com/likaileave/dsh-model-billing/releases):
+**npm**
+
+```sh
+dsh plugin --profile desktop add dsh-model-billing
+```
+
+**From dsh-market**
+
+Search for `dsh-model-billing` in dsh-market.
+
+**From a GitHub Release**
+
+Download `dsh-model-billing.tgz` from [Releases](https://github.com/likaileave/dsh-model-billing/releases), then:
 
 ```sh
 dsh plugin --profile desktop add ./dsh-model-billing.tgz
 ```
 
-From a checkout:
+**From a checkout**
 
 ```sh
 git clone https://github.com/likaileave/dsh-model-billing.git
@@ -155,6 +188,15 @@ dsh plugin --profile desktop add ./dsh-model-billing
 ```
 
 Refresh the Web page after installing or updating.
+
+### Release channels
+
+The npm package and the GitHub Release use the same version number and are published separately:
+
+- npm: <https://www.npmjs.com/package/dsh-model-billing>
+- GitHub Releases: <https://github.com/likaileave/dsh-model-billing/releases>
+
+They are parallel distribution channels, not an automatic mirror.
 
 ### Data
 
