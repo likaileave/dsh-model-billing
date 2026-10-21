@@ -29,7 +29,7 @@
 - **自定义模型顺序**：在“设置 → 模型与费用”中用 ↑ / ↓ 调整已配置模型的顺序。模型选择器按这个顺序展示，跨提供方也保持你排的顺序，并用提供方名称分组。
 - **三档 token 价格**：每个非 DeepSeek 模型可填写每百万 tokens 的缓存命中输入、缓存未命中输入、输出价格。`0` 是有效价格，留空表示未设置。
 - **DeepSeek 官方价内置**：`deepseek-flash` 和 `deepseek-v4-pro` 直接使用 DeepSeek 官网的峰谷价，只读展示，不需要填写。
-- **逐轮费用**：每轮结束后在轮尾显示该轮费用。
+- **逐轮费用与使用模型**：每轮结束后在轮尾显示这一轮使用的模型，以及该轮费用和缓存命中率。
 - **本会话费用**：输入框下方显示本会话累计估算、最近一轮费用和缓存命中率；展开后可查看按轮次和按模型的明细。
 - **DeepSeek 也计入金额**：每条 usage 按事件发生时的北京时间自动选择高峰或空闲价，与第三方模型一起进入统计。
 
@@ -148,7 +148,7 @@ node --test test/host.test.mjs test/routes.test.mjs
 - **Custom model order** in Settings → Models & Cost; the composer picker follows that order across providers and groups models by provider.
 - **Three prices per model**: cache-hit input, cache-miss input, and output, in CNY per million tokens. `0` is a valid price; blank means unset.
 - **Built-in official DeepSeek pricing** for `deepseek-flash` and `deepseek-v4-pro`, selected per usage event between peak and off-peak Beijing time.
-- **Per-turn amount** at the end of each turn.
+- **Per-turn model and amount** at the end of each turn, together with the turn's cache-hit rate.
 - **Session summary** below the composer plus a detail panel grouped by turn and by model.
 - **DeepSeek is billed too**, using the same three-price formula and the event's timestamp.
 

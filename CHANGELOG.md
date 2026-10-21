@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-10-21
+
+### Added
+
+- Show the model or models used by each turn at the end of that turn, next to the per-turn cost.
+
 ## [0.1.0] - 2026-10-20
 
 ### Added

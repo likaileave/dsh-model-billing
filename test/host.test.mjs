@@ -134,6 +134,12 @@ test('bills cache hit, cache miss, output and DeepSeek built-in prices for a tur
   assert.equal(result.turns[0].hasBillable, true)
   assert.equal(result.turns[0].preview, '第一轮的问题')
   assert.equal(result.turns[0].models.find((model) => model.isDeepSeek).cost, 5.02)
+  assert.equal(result.turns[0].models.length, 2)
+  assert.deepEqual(
+    result.turns[0].models.map((model) => model.name).sort(),
+    ['deepseek-account / deepseek-flash', '百炼 / Qwen3.8 Flash'].sort(),
+  )
+  assert.deepEqual(result.turns[1].models.map((model) => model.name), ['qwen / qwen3.8-max'])
   assert.equal(result.turns[1].costKnown, false)
   assert.equal(result.turns[1].unpricedAttempts, 1)
   assert.ok(Math.abs(result.totals.cost - 12.22) < 1e-9)

@@ -78,6 +78,8 @@ window.__ModuleLoader__.load({
         partialShort: '部分未定价',
         partialNote: '有非 DeepSeek 调用尚未配置完整价格，合计只包含已定价部分。',
         estimateNote: '金额由会话日志中的 token 用量和缓存命中估算；DeepSeek 按事件时间使用内置峰谷价，实际账单以提供方为准。',
+        turnModelTitle: '本轮实际调用的模型（多个模型按名称排序）',
+        listSep: '、',
         turnCost: '费用',
         turnCostTitle: '根据本轮 token 用量、缓存命中与价格估算',
         chooseModel: '选择模型',
@@ -150,6 +152,8 @@ window.__ModuleLoader__.load({
         partialShort: 'partly unpriced',
         partialNote: 'Some non-DeepSeek calls do not have a complete price set; the total includes only priced calls.',
         estimateNote: 'Amounts are estimated from token usage and cache hits in the session log; DeepSeek uses built-in peak/off-peak prices at the event time, and the provider bill is authoritative.',
+        turnModelTitle: 'Models actually called this turn (multiple models sorted by name)',
+        listSep: ', ',
         turnCost: 'Cost',
         turnCostTitle: 'Estimated from this turn’s tokens, cache hits and prices',
         chooseModel: 'Select model',
@@ -1030,20 +1034,42 @@ window.__ModuleLoader__.load({
     // Per-turn cost chip
     // ---------------------------------------------------------------------
 
-    function TurnCost({ turn, sessionId, useProjection }) {
+    function turnModelText(models, translate) {
+      const names = (models ?? []).map((entry) => {
+        if (entry === undefined || entry === null) return null
+        if (typeof entry.name === 'string' && entry.name !== '') return entry.name
+        return entry.provider !== undefined && entry.model !== undefined
+          ? `${entry.provider} / ${entry.model}`
+          : null
+      }).filter((name) => name !== null)
+      if (names.length === 0) return null
+      return names.join(translate('listSep'))
+    }
+
+    function TurnCost(props) {
+      const { turn } = props
+      // The turnTail owner hands over the whole folded turn life cycle, not just its number.
+      const turnNumber = turn === null || turn === undefined
+        ? undefined
+        : typeof turn === 'number' ? turn : turn.turn
+      const sessionId = props.sessionId
+      const useProjection = props.useProjection
       const translate = useT()
-      const tokenUsage = useProjection('tokenUsage')
+      const tokenUsage = typeof useProjection === 'function' ? useProjection('tokenUsage') : undefined
       const revision = tokenUsageRevision(tokenUsage)
       const usage = useSessionUsage(sessionId, revision)
-      const row = usage.data?.turns?.find((entry) => entry.turn === turn)
-      if (row === undefined || row.hasBillable !== true) return null
+      const rows = usage.data?.turns
+      const row = rows?.find((entry) => entry.turn === turnNumber)
+      if (row === undefined) return null
       const costText = row.costKnown
         ? `≈ ${formatMoney(row.cost)}`
         : row.pricedAttempts > 0 ? `≈ ${formatMoney(row.cost)}*` : translate('pricePlaceholder')
+      const modelText = turnModelText(row.models, translate)
       return h('span', {
         className: 'mb-turn',
-        title: translate('turnCostTitle'),
+        title: `${translate('turnModelTitle')}\n${translate('turnCostTitle')}`,
       },
+        modelText === null ? null : h(Fragment, null, translate('model'), ' ', h('strong', null, modelText), ' · '),
         translate('turnCost'), ' ', h('strong', null, costText),
         row.cacheHit === null ? null : ` · ${translate('cacheHit')} ${formatPercent(row.cacheHit)}`,
         row.partial ? ` · ${translate('partialShort')}` : '')
