@@ -14,6 +14,7 @@ const {
   deepseekPeakAt,
   deepseekPricingAt,
   loadState,
+  normalizeDisplay,
   normalizeState,
   normalizeUsage,
   publicPricing,
@@ -183,6 +184,43 @@ test('validates route pairs used as durable keys', () => {
   assert.equal(validRoute('qwen', 'x'.repeat(201)), false)
 })
 
+test('normalizes turn-tail display settings and drops unknown values', () => {
+  assert.deepEqual(normalizeDisplay(undefined), {
+    showModels: true,
+    showProvider: false,
+    showCost: true,
+    showTokens: false,
+    showCacheHit: false,
+    showLabels: true,
+    takeoverPicker: true,
+    fontSize: 'normal',
+    density: 'comfortable',
+    fontWeight: 'normal',
+  })
+  assert.deepEqual(normalizeDisplay({
+    showModels: false,
+    showProvider: true,
+    showTokens: 'yes',
+    showCacheHit: true,
+    takeoverPicker: false,
+    fontSize: 'huge',
+    density: 'compact',
+    fontWeight: 'bold',
+    extra: 'ignored',
+  }), {
+    showModels: false,
+    showProvider: true,
+    showCost: true,
+    showTokens: false,
+    showCacheHit: true,
+    showLabels: true,
+    takeoverPicker: false,
+    fontSize: 'normal',
+    density: 'compact',
+    fontWeight: 'bold',
+  })
+})
+
 test('persists order and prices atomically, retaining prices for later routes', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-model-billing-'))
   const previous = process.env.DSH_HOME
@@ -194,6 +232,15 @@ test('persists order and prices atomically, retaining prices for later routes', 
         { provider: 'qwen', model: 'qwen3.8-flash', pricing: qwenPricing },
         { provider: 'xiaomi', model: 'mimo-v2.6-pro', pricing: {} },
       ],
+      display: {
+        showModels: false,
+        showProvider: true,
+        showTokens: true,
+        takeoverPicker: false,
+        fontSize: 'large',
+        density: 'compact',
+        fontWeight: 'bold',
+      },
     })
     const first = await loadState(ctx)
     assert.deepEqual(first.order, [
@@ -201,6 +248,14 @@ test('persists order and prices atomically, retaining prices for later routes', 
       { provider: 'xiaomi', model: 'mimo-v2.6-pro' },
     ])
     assert.equal(publicPricing(first.pricing[key('qwen', 'qwen3.8-flash')]).output, 8)
+    assert.equal(first.display.showModels, false)
+    assert.equal(first.display.showProvider, true)
+    assert.equal(first.display.showCost, true)
+    assert.equal(first.display.showTokens, true)
+    assert.equal(first.display.takeoverPicker, false)
+    assert.equal(first.display.fontSize, 'large')
+    assert.equal(first.display.density, 'compact')
+    assert.equal(first.display.fontWeight, 'bold')
 
     await saveOrderAndPrices(ctx, {
       models: [
@@ -210,6 +265,8 @@ test('persists order and prices atomically, retaining prices for later routes', 
     const second = await loadState(ctx)
     assert.deepEqual(second.order, [{ provider: 'xiaomi', model: 'mimo-v2.6-pro' }])
     assert.equal(publicPricing(second.pricing[key('qwen', 'qwen3.8-flash')]).cacheMiss, 2)
+    assert.equal(second.display.showModels, false)
+    assert.equal(second.display.takeoverPicker, false)
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous

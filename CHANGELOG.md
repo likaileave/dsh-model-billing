@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2] - 2026-10-22
+
+### Added
+
+- Turn-tail display settings under Settings → Models & Cost: choose models, model provider, cost, tokens, cache-hit rate, and text labels; adjust font size, spacing, and weight.
+- A switch to let another picker take over the composer model selector; turning it off restores the built-in DSH picker.
+- Declared the supported DSH host range in `peerDependencies` so dsh-market can show host compatibility.
+
+### Changed
+
+- Turn-tail values now use the same secondary text color as the surrounding chat metadata instead of bright white.
+- Turn-tail fields are separated by spacing rather than middle dots, and the hover explanation has been removed.
+- The model column in the cost details panel is wide enough to show `DeepSeek-V4.1-Flash` without truncation.
+
 ## [0.1.1] - 2026-10-21
 
 ### Added

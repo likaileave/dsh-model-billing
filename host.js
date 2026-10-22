@@ -25,6 +25,22 @@ const MAX_STORED_PRICES = 2000
 const MAX_BODY_BYTES = 256 * 1024
 const PRICE_FIELDS = ['cacheHit', 'cacheMiss', 'output']
 const KEY_SEPARATOR = '\u0000'
+const DISPLAY_DEFAULTS = Object.freeze({
+  showModels: true,
+  showProvider: false,
+  showCost: true,
+  showTokens: false,
+  showCacheHit: false,
+  showLabels: true,
+  takeoverPicker: true,
+  fontSize: 'normal',
+  density: 'comfortable',
+  fontWeight: 'normal',
+})
+const DISPLAY_FLAGS = ['showModels', 'showProvider', 'showCost', 'showTokens', 'showCacheHit', 'showLabels', 'takeoverPicker']
+const DISPLAY_FONT_SIZES = new Set(['small', 'normal', 'large'])
+const DISPLAY_DENSITIES = new Set(['compact', 'comfortable'])
+const DISPLAY_FONT_WEIGHTS = new Set(['normal', 'bold'])
 const DEEPSEEK_PRICING_SCHEDULE = '北京时间周一至周五 9:00–12:00、14:00–18:00（法定节假日除外）'
 const DEEPSEEK_PRICES = {
   'deepseek-flash': {
@@ -174,6 +190,7 @@ function stateEnvelope(state) {
     stateVersion: STATE_VERSION,
     savedAt: state.savedAt,
     order: state.order.map((entry) => ({ provider: entry.provider, model: entry.model })),
+    display: { ...state.display },
   }
 }
 
@@ -614,12 +631,26 @@ async function loadState(ctx) {
   }
 }
 
+/** Validate persisted turn-tail display settings, keeping unknown keys out. */
+function normalizeDisplay(raw) {
+  const source = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+  const display = { ...DISPLAY_DEFAULTS }
+  for (const key of DISPLAY_FLAGS) {
+    if (typeof source[key] === 'boolean') display[key] = source[key]
+  }
+  if (DISPLAY_FONT_SIZES.has(source.fontSize)) display.fontSize = source.fontSize
+  if (DISPLAY_DENSITIES.has(source.density)) display.density = source.density
+  if (DISPLAY_FONT_WEIGHTS.has(source.fontWeight)) display.fontWeight = source.fontWeight
+  return display
+}
+
 /** Validate a persisted state document into the current shape. */
 function normalizeState(raw) {
   const state = {
     version: STATE_VERSION,
     order: [],
     pricing: {},
+    display: normalizeDisplay(raw?.display),
     savedAt: typeof raw?.savedAt === 'number' && Number.isFinite(raw.savedAt) ? raw.savedAt : 0,
   }
   const seen = new Set()
@@ -674,6 +705,10 @@ async function saveOrderAndPrices(ctx, body) {
     throw new BillingRefusal(400, 'bad-request', `models must be an array of at most ${MAX_MODELS} entries`)
   }
   const state = await loadState(ctx)
+  if (body?.display !== undefined && (body.display === null || typeof body.display !== 'object' || Array.isArray(body.display))) {
+    throw new BillingRefusal(400, 'bad-request', 'display must be an object')
+  }
+  const display = body?.display === undefined ? state.display : normalizeDisplay(body.display)
   const order = []
   const seen = new Set()
   const pricing = { ...state.pricing }
@@ -693,6 +728,7 @@ async function saveOrderAndPrices(ctx, body) {
     version: STATE_VERSION,
     order,
     pricing,
+    display,
     savedAt: Date.now(),
   }
   await enqueueWrite(ctx, next)
@@ -888,6 +924,7 @@ export const __test = {
   isDeepSeekRoute,
   loadState,
   modelKey,
+  normalizeDisplay,
   normalizeState,
   normalizeUsage,
   priceSetComplete,

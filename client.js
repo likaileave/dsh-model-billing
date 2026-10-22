@@ -78,10 +78,30 @@ window.__ModuleLoader__.load({
         partialShort: '部分未定价',
         partialNote: '有非 DeepSeek 调用尚未配置完整价格，合计只包含已定价部分。',
         estimateNote: '金额由会话日志中的 token 用量和缓存命中估算；DeepSeek 按事件时间使用内置峰谷价，实际账单以提供方为准。',
-        turnModelTitle: '本轮实际调用的模型（多个模型按名称排序）',
         listSep: '、',
         turnCost: '费用',
-        turnCostTitle: '根据本轮 token 用量、缓存命中与价格估算',
+        turnTokens: '本轮 Token',
+        displaySection: '轮尾显示',
+        displayHint: '控制每轮结束后在对话尾部显示的内容；修改后点“保存”生效。',
+        displayModels: '使用模型',
+        displayProvider: '模型提供商',
+        displayCost: '本轮费用',
+        displayTokens: 'Token 用量',
+        displayCacheHit: '缓存命中率',
+        displayLabels: '显示文字标签',
+        displayFontSize: '字号',
+        displayDensity: '间距',
+        displayWeight: '字重',
+        fontSizeSmall: '小',
+        fontSizeNormal: '标准',
+        fontSizeLarge: '大',
+        densityCompact: '紧凑',
+        densityComfortable: '舒适',
+        weightNormal: '常规',
+        weightBold: '加粗',
+        pickerSection: '模型选择器',
+        takeoverPicker: '接管模型选择器',
+        takeoverHint: '开启后使用本插件按自定义顺序排列的模型选择器；关闭后恢复 DSH 内置选择器。',
         chooseModel: '选择模型',
         loadingModels: '加载模型…',
         searchModel: '搜索模型',
@@ -152,10 +172,30 @@ window.__ModuleLoader__.load({
         partialShort: 'partly unpriced',
         partialNote: 'Some non-DeepSeek calls do not have a complete price set; the total includes only priced calls.',
         estimateNote: 'Amounts are estimated from token usage and cache hits in the session log; DeepSeek uses built-in peak/off-peak prices at the event time, and the provider bill is authoritative.',
-        turnModelTitle: 'Models actually called this turn (multiple models sorted by name)',
         listSep: ', ',
         turnCost: 'Cost',
-        turnCostTitle: 'Estimated from this turn’s tokens, cache hits and prices',
+        turnTokens: 'Turn tokens',
+        displaySection: 'Turn-tail display',
+        displayHint: 'Choose what appears below each completed turn; click Save to apply.',
+        displayModels: 'Models used',
+        displayProvider: 'Model provider',
+        displayCost: 'Turn cost',
+        displayTokens: 'Token usage',
+        displayCacheHit: 'Cache hit rate',
+        displayLabels: 'Show text labels',
+        displayFontSize: 'Font size',
+        displayDensity: 'Spacing',
+        displayWeight: 'Font weight',
+        fontSizeSmall: 'Small',
+        fontSizeNormal: 'Normal',
+        fontSizeLarge: 'Large',
+        densityCompact: 'Compact',
+        densityComfortable: 'Comfortable',
+        weightNormal: 'Regular',
+        weightBold: 'Bold',
+        pickerSection: 'Model picker',
+        takeoverPicker: 'Take over the model picker',
+        takeoverHint: 'On: use this plugin’s picker with your custom model order. Off: restore the built-in DSH picker.',
         chooseModel: 'Select model',
         loadingModels: 'Loading models…',
         searchModel: 'Search models',
@@ -215,6 +255,57 @@ window.__ModuleLoader__.load({
     function useT() {
       useSyncExternalStore(subscribeLocale, localeRevision, () => 0)
       return t
+    }
+
+    const DISPLAY_DEFAULTS = Object.freeze({
+      showModels: true,
+      showProvider: false,
+      showCost: true,
+      showTokens: false,
+      showCacheHit: false,
+      showLabels: true,
+      takeoverPicker: true,
+      fontSize: 'normal',
+      density: 'comfortable',
+      fontWeight: 'normal',
+    })
+
+    const DISPLAY_STORAGE_KEY = 'dsh-model-billing.display'
+
+    function readStoredDisplay() {
+      try {
+        const raw = localStorage.getItem(DISPLAY_STORAGE_KEY)
+        if (raw === null) return null
+        const parsed = JSON.parse(raw)
+        return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null
+      } catch {
+        return null
+      }
+    }
+
+    function writeStoredDisplay(value) {
+      try {
+        localStorage.setItem(DISPLAY_STORAGE_KEY, JSON.stringify(value))
+      } catch {
+        // Storage may be unavailable in restricted browser contexts.
+      }
+    }
+
+    function clearStoredDisplay() {
+      try {
+        localStorage.removeItem(DISPLAY_STORAGE_KEY)
+      } catch {
+        // Ignore unavailable storage.
+      }
+    }
+
+    function readDisplay(data) {
+      const source = data?.display
+      const server = source !== null && typeof source === 'object' && !Array.isArray(source)
+        ? { ...DISPLAY_DEFAULTS, ...source }
+        : { ...DISPLAY_DEFAULTS }
+      const stored = readStoredDisplay()
+      return stored === null ? server : { ...server, ...stored }
     }
 
     // ---------------------------------------------------------------------
@@ -501,17 +592,37 @@ window.__ModuleLoader__.load({
       .mb-turn-table { table-layout: fixed; }
       .mb-turn-table th, .mb-turn-table td, .mb-turn-table th.num, .mb-turn-table td.num { text-align: left; }
       .mb-turn-table th:nth-child(1), .mb-turn-table td:nth-child(1) { width: 5%; }
-      .mb-turn-table th:nth-child(2), .mb-turn-table td:nth-child(2) { width: 26.5%; }
+      .mb-turn-table th:nth-child(2), .mb-turn-table td:nth-child(2) { width: 25.5%; }
       .mb-turn-table th:nth-child(3), .mb-turn-table td:nth-child(3) { width: 12.5%; }
-      .mb-turn-table th:nth-child(4), .mb-turn-table td:nth-child(4) { width: 20%; }
+      .mb-turn-table th:nth-child(4), .mb-turn-table td:nth-child(4) { width: 21%; }
       .mb-turn-table th:nth-child(5), .mb-turn-table td:nth-child(5) { width: 10%; }
       .mb-turn-table th:nth-child(6), .mb-turn-table td:nth-child(6) { width: 16%; }
       .mb-turn-table th:nth-child(7), .mb-turn-table td:nth-child(7) { width: 10%; }
       .mb-turn-preview, .mb-turn-model { color: var(--dsw-alias-label-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mb-turn-model { color: var(--dsw-alias-label-primary); }
       .mb-panel-note { margin: 9px 0 0; color: var(--dsw-alias-label-secondary); font-size: 11px; }
-      .mb-turn { color: var(--dsw-alias-label-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
-      .mb-turn strong { color: var(--dsw-alias-label-primary); font-weight: 600; }
+      .mb-turn { color: var(--dsw-alias-label-secondary); font-size: 12px; font-variant-numeric: tabular-nums; display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 2px; max-width: 100%; }
+      .mb-turn[data-size="small"] { font-size: 11px; }
+      .mb-turn[data-size="large"] { font-size: 13px; }
+      .mb-turn[data-density="compact"] { column-gap: 6px; }
+      .mb-turn-item { white-space: nowrap; }
+      .mb-turn strong { color: inherit; font-weight: 600; }
+      .mb-turn[data-weight="normal"] { font-weight: 400; }
+      .mb-turn[data-weight="normal"] strong { font-weight: 400; }
+      .mb-turn[data-weight="bold"] { font-weight: 600; }
+      .mb-turn[data-weight="bold"] strong { font-weight: 600; }
+      .mb-turn-partial { color: var(--dsw-alias-state-warn-primary); }
+      .mb-display { border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 12px 14px; margin: 10px 0 14px; background: var(--dsw-alias-bg-layer-2); }
+      .mb-display-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+      .mb-display-title { font-weight: 600; }
+      .mb-display-hint { color: var(--dsw-alias-label-secondary); font-size: 12px; }
+      .mb-check-grid { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+      .mb-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+      .mb-check.is-disabled { opacity: .55; cursor: default; }
+      .mb-check input { width: 15px; height: 15px; accent-color: var(--dsw-alias-brand-primary); }
+      .mb-display-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 12px; }
+      .mb-select { height: 30px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 0 8px; font: inherit; }
+      .mb-select:focus { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -1px; }
       .mb-picker { position: relative; display: flex; min-width: 0; }
       .mb-picker-trigger { border-radius: var(--dsw-radius-sm); min-width: 0; max-width: min(360px, 45cqw); height: 28px; color: var(--dsw-alias-label-secondary); cursor: pointer; background: 0 0; border: none; outline: none; align-items: center; gap: 4px; padding: 0 4px 0 8px; font-size: 13px; font-weight: 400; line-height: 20px; display: flex; }
       .mb-picker-trigger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
@@ -602,6 +713,7 @@ window.__ModuleLoader__.load({
       const translate = useT()
       const snap = useCatalog()
       const [draft, setDraft] = useState(null)
+      const [display, setDisplay] = useState(null)
       const [dirty, setDirty] = useState(false)
       const [saving, setSaving] = useState(false)
       const [status, setStatus] = useState(null)
@@ -609,6 +721,7 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (snap.data === null) return
         setDraft(toDraft(snap.data.models))
+        setDisplay(readDisplay(snap.data))
         setDirty(false)
       }, [snap.data])
 
@@ -641,10 +754,88 @@ window.__ModuleLoader__.load({
       }
 
       const reset = () => {
-        if (snap.data !== null) setDraft(toDraft(snap.data.models))
+        clearStoredDisplay()
+        emitCatalog()
+        if (snap.data !== null) {
+          setDraft(toDraft(snap.data.models))
+          setDisplay(readDisplay(snap.data))
+        }
         setDirty(false)
         setStatus(null)
       }
+
+      const displayValue = display ?? readDisplay(snap.data)
+
+      const updateDisplay = (change) => {
+        setDisplay((current) => ({ ...(current ?? readDisplay(snap.data)), ...change }))
+        setDirty(true)
+        setStatus(null)
+      }
+
+      const renderDisplaySettings = () => h(Fragment, null,
+        h('div', { className: 'mb-display' },
+          h('div', { className: 'mb-display-head' },
+            h('div', { className: 'mb-display-title' }, translate('displaySection')),
+            h('div', { className: 'mb-display-hint' }, translate('displayHint'))),
+          h('div', { className: 'mb-check-grid' },
+            [
+              ['showProvider', 'displayProvider'],
+              ['showModels', 'displayModels'],
+              ['showCost', 'displayCost'],
+              ['showTokens', 'displayTokens'],
+              ['showCacheHit', 'displayCacheHit'],
+              ['showLabels', 'displayLabels'],
+            ].map(([field, label]) => h('label', {
+              className: `mb-check${field === 'showProvider' && displayValue.showModels !== true ? ' is-disabled' : ''}`,
+              key: field,
+            },
+              h('input', {
+                type: 'checkbox',
+                checked: displayValue[field] === true,
+                disabled: field === 'showProvider' && displayValue.showModels !== true,
+                onChange: (event) => updateDisplay({ [field]: event.target.checked }),
+              }),
+              h('span', null, translate(label))))),
+          h('div', { className: 'mb-display-controls' },
+            h('label', { className: 'mb-field' },
+              h('span', { className: 'mb-field-label' }, translate('displayFontSize')),
+              h('select', {
+                className: 'mb-select',
+                value: displayValue.fontSize,
+                onChange: (event) => updateDisplay({ fontSize: event.target.value }),
+              },
+                h('option', { value: 'small' }, translate('fontSizeSmall')),
+                h('option', { value: 'normal' }, translate('fontSizeNormal')),
+                h('option', { value: 'large' }, translate('fontSizeLarge')))),
+            h('label', { className: 'mb-field' },
+              h('span', { className: 'mb-field-label' }, translate('displayDensity')),
+              h('select', {
+                className: 'mb-select',
+                value: displayValue.density,
+                onChange: (event) => updateDisplay({ density: event.target.value }),
+              },
+                h('option', { value: 'compact' }, translate('densityCompact')),
+                h('option', { value: 'comfortable' }, translate('densityComfortable')))),
+            h('label', { className: 'mb-field' },
+              h('span', { className: 'mb-field-label' }, translate('displayWeight')),
+              h('select', {
+                className: 'mb-select',
+                value: displayValue.fontWeight,
+                onChange: (event) => updateDisplay({ fontWeight: event.target.value }),
+              },
+                h('option', { value: 'normal' }, translate('weightNormal')),
+                h('option', { value: 'bold' }, translate('weightBold')))))),
+        h('div', { className: 'mb-display' },
+          h('div', { className: 'mb-display-head' },
+            h('div', { className: 'mb-display-title' }, translate('pickerSection')),
+            h('div', { className: 'mb-display-hint' }, translate('takeoverHint'))),
+          h('label', { className: 'mb-check' },
+            h('input', {
+              type: 'checkbox',
+              checked: displayValue.takeoverPicker === true,
+              onChange: (event) => updateDisplay({ takeoverPicker: event.target.checked }),
+            }),
+            h('span', null, translate('takeoverPicker')))))
 
       const save = async () => {
         if (draft === null) return
@@ -671,8 +862,9 @@ window.__ModuleLoader__.load({
           await requestJson('/model-billing/save', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ models: payload }),
+            body: JSON.stringify({ models: payload, display: displayValue }),
           })
+          writeStoredDisplay(displayValue)
           setDirty(false)
           setStatus({ tone: 'success', text: translate('saved') })
           await ensureCatalog(true)
@@ -710,6 +902,7 @@ window.__ModuleLoader__.load({
           h('section', { className: 'mb-page' },
             h('h2', { className: 'mb-title' }, translate('title')),
             h('p', { className: 'mb-intro' }, translate('intro')),
+            renderDisplaySettings(),
             h('div', { className: 'mb-empty' }, translate('noModels'))))
       }
 
@@ -725,6 +918,7 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', className: 'mb-btn', disabled: !dirty || saving, onClick: reset }, translate('undo')),
             h('button', { type: 'button', className: 'mb-btn mb-btn-primary', disabled: !dirty || saving, onClick: () => void save() }, saving ? translate('saving') : translate('save'))),
           status === null ? null : h('div', { className: 'mb-status', 'data-tone': status.tone, role: 'status' }, status.text),
+          renderDisplaySettings(),
           h('p', { className: 'mb-note' }, translate('orderHint')),
           h('ul', { className: 'mb-list' },
             models.map((entry, index) => h(SettingsModelCard, {
@@ -1034,13 +1228,27 @@ window.__ModuleLoader__.load({
     // Per-turn cost chip
     // ---------------------------------------------------------------------
 
-    function turnModelText(models, translate) {
+    function turnModelText(models, translate, showProvider, catalogModels) {
+      const findModel = (entry) => {
+        if (entry.provider === undefined || entry.model === undefined) return undefined
+        return (catalogModels ?? []).find((candidate) => candidate.provider === entry.provider && candidate.model === entry.model)
+      }
       const names = (models ?? []).map((entry) => {
         if (entry === undefined || entry === null) return null
-        if (typeof entry.name === 'string' && entry.name !== '') return entry.name
-        return entry.provider !== undefined && entry.model !== undefined
-          ? `${entry.provider} / ${entry.model}`
-          : null
+        const matched = findModel(entry)
+        const modelName = typeof matched?.name === 'string' && matched.name !== ''
+          ? matched.name
+          : typeof entry.name === 'string' && entry.name !== ''
+            ? entry.name
+            : typeof entry.model === 'string' && entry.model !== '' ? entry.model : null
+        if (modelName === null) return null
+        if (!showProvider) return modelName
+        const providerName = typeof matched?.providerName === 'string' && matched.providerName !== ''
+          ? matched.providerName
+          : typeof entry.providerName === 'string' && entry.providerName !== ''
+            ? entry.providerName
+            : typeof entry.provider === 'string' && entry.provider !== '' ? entry.provider : null
+        return providerName === null ? modelName : `${providerName} / ${modelName}`
       }).filter((name) => name !== null)
       if (names.length === 0) return null
       return names.join(translate('listSep'))
@@ -1055,6 +1263,8 @@ window.__ModuleLoader__.load({
       const sessionId = props.sessionId
       const useProjection = props.useProjection
       const translate = useT()
+      const catalogSnap = useCatalog()
+      const display = readDisplay(catalogSnap.data)
       const tokenUsage = typeof useProjection === 'function' ? useProjection('tokenUsage') : undefined
       const revision = tokenUsageRevision(tokenUsage)
       const usage = useSessionUsage(sessionId, revision)
@@ -1064,15 +1274,37 @@ window.__ModuleLoader__.load({
       const costText = row.costKnown
         ? `≈ ${formatMoney(row.cost)}`
         : row.pricedAttempts > 0 ? `≈ ${formatMoney(row.cost)}*` : translate('pricePlaceholder')
-      const modelText = turnModelText(row.models, translate)
+      const modelText = turnModelText(row.models, translate, display.showProvider === true, catalogSnap.data?.models)
+      const label = (key) => display.showLabels ? `${translate(key)} ` : ''
+      const parts = []
+      if (display.showModels && modelText !== null) {
+        parts.push(h('span', { className: 'mb-turn-item', key: 'model' },
+          label('model'), h('strong', null, modelText)))
+      }
+      if (display.showCost) {
+        parts.push(h('span', { className: 'mb-turn-item', key: 'cost' },
+          label('turnCost'), h('strong', null, costText)))
+      }
+      const promptTokens = Number.isFinite(row.promptTokens) ? row.promptTokens : 0
+      const outputTokens = Number.isFinite(row.outputTokens) ? row.outputTokens : 0
+      if (display.showTokens && (promptTokens > 0 || outputTokens > 0)) {
+        parts.push(h('span', { className: 'mb-turn-item', key: 'tokens' },
+          label('turnTokens'), h('strong', null, `${formatTokens(promptTokens)} / ${formatTokens(outputTokens)}`)))
+      }
+      if (display.showCacheHit && row.cacheHit !== null && row.cacheHit !== undefined) {
+        parts.push(h('span', { className: 'mb-turn-item', key: 'cache' },
+          label('cacheHit'), h('strong', null, formatPercent(row.cacheHit))))
+      }
+      if (row.partial) {
+        parts.push(h('span', { className: 'mb-turn-item mb-turn-partial', key: 'partial' }, translate('partialShort')))
+      }
+      if (parts.length === 0) return null
       return h('span', {
         className: 'mb-turn',
-        title: `${translate('turnModelTitle')}\n${translate('turnCostTitle')}`,
-      },
-        modelText === null ? null : h(Fragment, null, translate('model'), ' ', h('strong', null, modelText), ' · '),
-        translate('turnCost'), ' ', h('strong', null, costText),
-        row.cacheHit === null ? null : ` · ${translate('cacheHit')} ${formatPercent(row.cacheHit)}`,
-        row.partial ? ` · ${translate('partialShort')}` : '')
+        'data-size': display.fontSize,
+        'data-density': display.density,
+        'data-weight': display.fontWeight,
+      }, parts)
     }
 
     // ---------------------------------------------------------------------
@@ -1485,6 +1717,13 @@ window.__ModuleLoader__.load({
         open ? ReactDOM.createPortal(menu, document.body) : null)
     }
 
+    function ModelPickerSeat(props) {
+      const catalogSnap = useCatalog()
+      const display = readDisplay(catalogSnap.data)
+      if (!display.takeoverPicker) return null
+      return h(OrderedModelPicker, props)
+    }
+
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
@@ -1492,10 +1731,34 @@ window.__ModuleLoader__.load({
         publishModelDirectories(ctx.get('modelDirectories'))
         ctx.inject(['modelDirectories'], (scope) => {
           publishModelDirectories(scope.modelDirectories)
-          scope.slots.inject('conversation.input.model', () => scope.slots.register({
-            name: 'conversation.input.model',
-            priority: -1,
-          }, OrderedModelPicker))
+          let seat = null
+          const takeoverEnabled = () => readDisplay(catalog.snap.data).takeoverPicker !== false
+          const syncSeat = () => {
+            if (takeoverEnabled()) {
+              if (seat === null) {
+                seat = scope.slots.register({
+                  name: 'conversation.input.model',
+                  priority: -1,
+                }, ModelPickerSeat)
+              }
+              return
+            }
+            if (seat !== null) {
+              seat()
+              seat = null
+            }
+          }
+          scope.slots.inject('conversation.input.model', () => {
+            const unsubscribe = subscribeCatalog(syncSeat)
+            syncSeat()
+            return () => {
+              unsubscribe()
+              if (seat !== null) {
+                seat()
+                seat = null
+              }
+            }
+          })
         })
 
         void ensureCatalog()

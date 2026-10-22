@@ -114,6 +114,8 @@ test('registers catalog, save and usage routes and serves one consistent state',
     assert.deepEqual(catalog.body.models[0].reasoning.efforts.map((effort) => effort.id), ['low', 'high'])
     assert.equal(catalog.body.models[0].reasoning.defaultEffort, 'low')
     assert.equal(catalog.body.models[0].pricing.output, null)
+    assert.equal(catalog.body.display.takeoverPicker, true)
+    assert.equal(catalog.body.display.showProvider, false)
 
     const save = await callRoute(routes.get('/model-billing/save'), fakeRequest({
       method: 'POST',
@@ -125,6 +127,7 @@ test('registers catalog, save and usage routes and serves one consistent state',
           { provider: 'qwen', model: 'flash', pricing: { cacheHit: 0.5, cacheMiss: 2, output: 8 } },
           { provider: 'deepseek-account', model: 'deepseek-flash', pricing: {} },
         ],
+        display: { showCost: false, showProvider: true, showTokens: true, takeoverPicker: false, density: 'compact', fontWeight: 'bold' },
       }),
     }))
     assert.equal(save.status, 200)
@@ -135,6 +138,12 @@ test('registers catalog, save and usage routes and serves one consistent state',
     assert.equal(afterSave.body.models[0].pricing.output, 8)
     assert.equal(afterSave.body.models[2].pricing.builtin, true)
     assert.equal(afterSave.body.models[2].pricing.peak.output, 8)
+    assert.equal(afterSave.body.display.showCost, false)
+    assert.equal(afterSave.body.display.showProvider, true)
+    assert.equal(afterSave.body.display.showTokens, true)
+    assert.equal(afterSave.body.display.takeoverPicker, false)
+    assert.equal(afterSave.body.display.density, 'compact')
+    assert.equal(afterSave.body.display.fontWeight, 'bold')
 
     const usage = await callRoute(routes.get('/model-billing/usage'), fakeRequest({
       url: '/model-billing/usage?sessionId=session-1',

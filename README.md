@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://unpkg.com/dsh-model-billing@0.1.0/icon.svg" width="72" height="72" alt="dsh-model-billing icon">
+  <img src="https://unpkg.com/dsh-model-billing@latest/icon.svg" width="72" height="72" alt="dsh-model-billing icon">
 </p>
 
 <h1 align="center">dsh-model-billing</h1>
@@ -10,6 +10,8 @@
   <a href="https://www.npmjs.com/package/dsh-model-billing"><img alt="npm version" src="https://img.shields.io/npm/v/dsh-model-billing.svg"></a>
   <a href="https://github.com/likaileave/dsh-model-billing/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/likaileave/dsh-model-billing"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/likaileave/dsh-model-billing"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img alt="DeepSeek Harness plugin" src="https://img.shields.io/badge/DeepSeek%20Harness-dsh--plugin-4D6BFE"></a>
+  <a href="https://awesome-dsh-plugin.com"><img alt="Awesome DSH Plugin" src="https://awesome-dsh-plugin.com/badge.svg"></a>
 </p>
 
 <p align="center">
@@ -22,7 +24,7 @@
 
 ## 中文
 
-`dsh-model-billing` 是一个 DSH Web 客户端插件。它接管输入框右下角的模型选择器，让你按自己的顺序排列模型，并为每个模型维护三档 token 价格；会话过程中按实际 usage 估算每一轮和整个会话的费用。
+`dsh-model-billing` 是一个 DSH Web 客户端插件。它可以接管输入框右下角的模型选择器，让你按自己的顺序排列模型，并为每个模型维护三档 token 价格；会话过程中按实际 usage 估算每一轮和整个会话的费用。
 
 ### 功能
 
@@ -30,6 +32,7 @@
 - **三档 token 价格**：每个非 DeepSeek 模型可填写每百万 tokens 的缓存命中输入、缓存未命中输入、输出价格。`0` 是有效价格，留空表示未设置。
 - **DeepSeek 官方价内置**：`deepseek-flash` 和 `deepseek-v4-pro` 直接使用 DeepSeek 官网的峰谷价，只读展示，不需要填写。
 - **逐轮费用与使用模型**：每轮结束后在轮尾显示这一轮使用的模型，以及该轮费用和缓存命中率。
+- **可配置轮尾**：在设置中开关使用模型、模型提供商、费用、token、缓存命中率、文字标签，并调整字号、间距和字重；也可以关闭选择器接管，恢复 DSH 内置模型选择器。
 - **本会话费用**：输入框下方显示本会话累计估算、最近一轮费用和缓存命中率；展开后可查看按轮次和按模型的明细。
 - **DeepSeek 也计入金额**：每条 usage 按事件发生时的北京时间自动选择高峰或空闲价，与第三方模型一起进入统计。
 
@@ -65,6 +68,8 @@ DeepSeek 价格只读，不写入本地价格配置。官网调价或节假日�
 不同平台的缓存折扣、上下文阶梯价和活动价差异较大，建议直接使用你的实际结算价。插件不做自动抓取，也不猜测默认价。
 
 ### 安装
+
+需要 DSH `^0.2.0-rc.2`。
 
 **npm**
 
@@ -141,7 +146,7 @@ node --test test/host.test.mjs test/routes.test.mjs
 
 ## English
 
-`dsh-model-billing` is a DSH Web GUI plugin that takes over the composer's model picker, lets you order configured models yourself, stores three per-million-token prices per model, and estimates per-turn and session cost from provider usage.
+`dsh-model-billing` is a DSH Web GUI plugin that can take over the composer's model picker, lets you order configured models yourself, stores three per-million-token prices per model, and estimates per-turn and session cost from provider usage.
 
 ### Features
 
@@ -149,6 +154,7 @@ node --test test/host.test.mjs test/routes.test.mjs
 - **Three prices per model**: cache-hit input, cache-miss input, and output, in CNY per million tokens. `0` is a valid price; blank means unset.
 - **Built-in official DeepSeek pricing** for `deepseek-flash` and `deepseek-v4-pro`, selected per usage event between peak and off-peak Beijing time.
 - **Per-turn model and amount** at the end of each turn, together with the turn's cache-hit rate.
+- **Configurable turn tail**: toggle models, provider names, cost, tokens, cache-hit rate, and text labels; adjust font size, spacing, and weight; or disable the picker takeover to restore the built-in DSH picker.
 - **Session summary** below the composer plus a detail panel grouped by turn and by model.
 - **DeepSeek is billed too**, using the same three-price formula and the event's timestamp.
 
@@ -165,6 +171,8 @@ Prices are CNY per million tokens. Cache writes are approximated at the cache-mi
 The plugin ships **no third-party price defaults**. Enter your provider's actual rates in Settings → Models & Cost. Models without a complete three-price set are marked as unpriced and contribute no amount. DeepSeek prices are read-only and built into `host.js`.
 
 ### Install
+
+Requires DSH `^0.2.0-rc.2`.
 
 **npm**
 
