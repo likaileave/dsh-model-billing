@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
         saved: '已保存',
         unsaved: '有未保存的修改',
         undo: '撤销修改',
-        orderHint: '用 ↑ / ↓ 调整顺序；顺序直接决定对话框右下角模型选择器中的排列，也用于费用明细。',
+        orderHint: '用 ↑ / ↓ 调整顺序；顺序直接决定对话框右下角模型选择器中的排列，也用于费用估算。',
         noModels: '当前没有可用的已配置模型。',
         up: '上移',
         down: '下移',
@@ -42,8 +42,13 @@ window.__ModuleLoader__.load({
         outputPrice: '输出',
         perMillion: '元 / 百万 tokens',
         deepseekTag: 'DeepSeek',
-        deepseekNote: '官方峰谷价只读；DeepSeek 已按事件发生时间自动计入估算。',
-        officialPrice: '官方定价（只读）',
+        deepseekNote: '默认使用官方峰谷价；填写完整的自定义价格后，将优先按自定义价格估算。',
+        officialPrice: '官方定价',
+        priceSourceOfficial: '官方价',
+        priceSourceCustom: '自定义',
+        customizePrice: '自定义价格',
+        useOfficialPrice: '恢复官方价',
+        customPriceNote: '自定义价格优先于官方峰谷价；三项留空并保存即可恢复官方价。',
         peak: '高峰',
         offPeak: '空闲',
         deepseekSchedule: '高峰为北京时间周一至周五 9:00–12:00、14:00–18:00（法定节假日除外）；其余时段为空闲。',
@@ -55,13 +60,12 @@ window.__ModuleLoader__.load({
         priceUnit: '元/M',
         invalidPrice: '价格必须是非负数字，或留空表示未设置。',
         saveFailed: '保存失败：{message}',
-        savedAt: '已保存于 {time}',
         formula: '估算公式：缓存命中输入 × 命中价 +（未缓存输入 + 缓存写入）× 未命中价 + 输出 × 输出价。',
         formulaNote: '价格按每百万 tokens 计。缓存写入按缓存未命中价计算；未配置价格的模型不产生金额。',
         singlePrice: '价格',
         settingsOpen: '在设置中编辑',
         costEstimate: '费用估算',
-        costDetails: '费用明细',
+        costDetails: '输入框下方费用估算',
         close: '关闭',
         thisTurn: '本轮',
         sessionTotal: '本会话',
@@ -77,11 +81,28 @@ window.__ModuleLoader__.load({
         partial: '部分未定价',
         partialShort: '部分未定价',
         partialNote: '有非 DeepSeek 调用尚未配置完整价格，合计只包含已定价部分。',
+        showUnpricedNotice: '显示未定价提示',
+        unpricedRoutes: '未定价路由',
+        addPrice: '补充价格',
+        priceSaved: '价格已保存',
+        archiveSection: '历史价格',
+        archiveHint: '已移除模型的调用仍按这里保存的价格计价，不需要把它们加回模型列表。',
+        archiveEmpty: '暂无历史价格',
+        addArchive: '添加历史价格',
+        archiveProvider: '提供商',
+        archiveModel: '模型',
+        archiveConflict: '该路由仍在当前模型列表中，请直接编辑上方的模型价格。',
+        invalidRoute: '提供商和模型都不能为空。',
+        remove: '删除',
         estimateNote: '金额由会话日志中的 token 用量和缓存命中估算；DeepSeek 按事件时间使用内置峰谷价，实际账单以提供方为准。',
         listSep: '、',
         turnCost: '费用',
         turnTokens: '本轮 Token',
         displaySection: '轮尾显示',
+        displayTurnTail: '启用轮尾显示',
+        displayDock: '显示输入框下方费用估算',
+        dockSection: '输入框下方费用估算',
+        dockHint: '控制输入框下方的费用条与费用估算弹层。',
         displayHint: '控制每轮结束后在对话尾部显示的内容；修改后点“保存”生效。',
         displayModels: '使用模型',
         displayProvider: '模型提供商',
@@ -136,8 +157,13 @@ window.__ModuleLoader__.load({
         outputPrice: 'Output',
         perMillion: 'CNY / million tokens',
         deepseekTag: 'DeepSeek',
-        deepseekNote: 'Official peak/off-peak prices are read-only; DeepSeek is now billed automatically at the event time.',
-        officialPrice: 'Official prices (read-only)',
+        deepseekNote: 'Official peak/off-peak prices are used by default; a complete custom price set takes precedence.',
+        officialPrice: 'Official prices',
+        priceSourceOfficial: 'Official',
+        priceSourceCustom: 'Custom',
+        customizePrice: 'Set custom prices',
+        useOfficialPrice: 'Restore official prices',
+        customPriceNote: 'Custom prices override the official peak/off-peak table. Leave all three blank and save to restore official prices.',
         peak: 'Peak',
         offPeak: 'Off-peak',
         deepseekSchedule: 'Peak: Beijing time Mon–Fri 09:00–12:00 and 14:00–18:00, excluding Chinese statutory holidays; all other times are off-peak.',
@@ -149,13 +175,12 @@ window.__ModuleLoader__.load({
         priceUnit: 'CNY/M',
         invalidPrice: 'Prices must be non-negative numbers, or blank when unset.',
         saveFailed: 'Save failed: {message}',
-        savedAt: 'Saved at {time}',
         formula: 'Estimate: cached input × hit price + (uncached input + cache write) × miss price + output × output price.',
         formulaNote: 'Prices are per million tokens. Cache writes use the cache-miss price; models without a full price set produce no amount.',
         singlePrice: 'Prices',
         settingsOpen: 'Edit in Settings',
         costEstimate: 'Cost estimate',
-        costDetails: 'Cost details',
+        costDetails: 'Composer cost estimate',
         close: 'Close',
         thisTurn: 'Turn',
         sessionTotal: 'Session',
@@ -171,11 +196,28 @@ window.__ModuleLoader__.load({
         partial: 'partly unpriced',
         partialShort: 'partly unpriced',
         partialNote: 'Some non-DeepSeek calls do not have a complete price set; the total includes only priced calls.',
+        showUnpricedNotice: 'Show unpriced notices',
+        unpricedRoutes: 'Unpriced routes',
+        addPrice: 'Add price',
+        priceSaved: 'Price saved',
+        archiveSection: 'Historical prices',
+        archiveHint: 'Calls to removed models stay priced from this book; you do not need to add them back to the model list.',
+        archiveEmpty: 'No historical prices yet',
+        addArchive: 'Add historical price',
+        archiveProvider: 'Provider',
+        archiveModel: 'Model',
+        archiveConflict: 'This route is still in the configured list; edit its price above instead.',
+        invalidRoute: 'Provider and model are both required.',
+        remove: 'Remove',
         estimateNote: 'Amounts are estimated from token usage and cache hits in the session log; DeepSeek uses built-in peak/off-peak prices at the event time, and the provider bill is authoritative.',
         listSep: ', ',
         turnCost: 'Cost',
         turnTokens: 'Turn tokens',
         displaySection: 'Turn-tail display',
+        displayTurnTail: 'Show the turn tail',
+        displayDock: 'Show the composer cost estimate',
+        dockSection: 'Composer cost estimate',
+        dockHint: 'Controls the cost bar below the composer and its detail panel.',
         displayHint: 'Choose what appears below each completed turn; click Save to apply.',
         displayModels: 'Models used',
         displayProvider: 'Model provider',
@@ -258,12 +300,15 @@ window.__ModuleLoader__.load({
     }
 
     const DISPLAY_DEFAULTS = Object.freeze({
+      showTurnTail: true,
+      showDock: true,
       showModels: true,
       showProvider: false,
       showCost: true,
       showTokens: false,
       showCacheHit: false,
       showLabels: true,
+      showUnpricedNotice: true,
       takeoverPicker: true,
       fontSize: 'normal',
       density: 'comfortable',
@@ -271,25 +316,6 @@ window.__ModuleLoader__.load({
     })
 
     const DISPLAY_STORAGE_KEY = 'dsh-model-billing.display'
-
-    function readStoredDisplay() {
-      try {
-        const raw = localStorage.getItem(DISPLAY_STORAGE_KEY)
-        if (raw === null) return null
-        const parsed = JSON.parse(raw)
-        return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null
-      } catch {
-        return null
-      }
-    }
-
-    function writeStoredDisplay(value) {
-      try {
-        localStorage.setItem(DISPLAY_STORAGE_KEY, JSON.stringify(value))
-      } catch {
-        // Storage may be unavailable in restricted browser contexts.
-      }
-    }
 
     function clearStoredDisplay() {
       try {
@@ -299,13 +325,16 @@ window.__ModuleLoader__.load({
       }
     }
 
+    // Older builds mirrored display settings into localStorage, which made the
+    // browser a second source of truth that could never sync across devices.
+    // Clear the legacy key once; the Host state is now the only copy.
+    clearStoredDisplay()
+
     function readDisplay(data) {
       const source = data?.display
-      const server = source !== null && typeof source === 'object' && !Array.isArray(source)
+      return source !== null && typeof source === 'object' && !Array.isArray(source)
         ? { ...DISPLAY_DEFAULTS, ...source }
         : { ...DISPLAY_DEFAULTS }
-      const stored = readStoredDisplay()
-      return stored === null ? server : { ...server, ...stored }
     }
 
     // ---------------------------------------------------------------------
@@ -319,16 +348,32 @@ window.__ModuleLoader__.load({
       generation: 0,
     }
 
+    const REQUEST_TIMEOUT_MS = 8000
+
     async function requestJson(url, options) {
-      const response = await fetch(url, {
-        credentials: 'same-origin',
-        cache: 'no-store',
-        ...options,
-        headers: {
-          accept: 'application/json',
-          ...(options?.headers ?? {}),
-        },
-      })
+      const controller = typeof AbortController === 'function' ? new AbortController() : null
+      const timeout = controller === null
+        ? null
+        : setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+      let response
+      try {
+        response = await fetch(url, {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          ...options,
+          signal: options?.signal ?? controller?.signal ?? null,
+          headers: {
+            accept: 'application/json',
+            ...(options?.headers ?? {}),
+          },
+        })
+      } catch (error) {
+        if (timeout !== null) clearTimeout(timeout)
+        throw controller !== null && error?.name === 'AbortError'
+          ? new Error(`timeout after ${REQUEST_TIMEOUT_MS}ms`)
+          : error
+      }
+      if (timeout !== null) clearTimeout(timeout)
       let body
       try {
         body = await response.json()
@@ -394,6 +439,7 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
 
     const usageSlots = new Map()
+    const USAGE_DEBOUNCE_MS = 300
 
     function usageSlot(sessionId) {
       let slot = usageSlots.get(sessionId)
@@ -404,10 +450,24 @@ window.__ModuleLoader__.load({
           inflight: null,
           generation: 0,
           revision: null,
+          pending: null,
+          refs: 0,
+          rowsByTurn: new Map(),
         }
         usageSlots.set(sessionId, slot)
       }
+      slot.refs += 1
       return slot
+    }
+
+    function releaseSlot(sessionId, slot) {
+      slot.refs = Math.max(0, slot.refs - 1)
+      if (slot.listeners.size > 0 || slot.refs > 0) return
+      if (slot.pending !== null) {
+        clearTimeout(slot.pending)
+        slot.pending = null
+      }
+      usageSlots.delete(sessionId)
     }
 
     function emitUsage(slot) {
@@ -417,8 +477,20 @@ window.__ModuleLoader__.load({
     function ensureUsage(sessionId, revision, force = false) {
       const slot = usageSlot(sessionId)
       if (!force && slot.revision === revision && slot.snap.status !== 'error') return
-      if (slot.inflight !== null && slot.inflight === revision && !force) return
+      if (slot.inflight !== null && !force) return
       slot.revision = revision
+      if (slot.pending !== null) clearTimeout(slot.pending)
+      // Collapse the token-counter updates a streaming reply produces into one
+      // trailing request instead of one request per token.
+      slot.pending = setTimeout(() => {
+        slot.pending = null
+        void fetchUsage(sessionId, revision)
+      }, USAGE_DEBOUNCE_MS)
+    }
+
+    function fetchUsage(sessionId, revision) {
+      const slot = usageSlots.get(sessionId)
+      if (slot === undefined) return
       slot.generation += 1
       const generation = slot.generation
       slot.snap = { ...slot.snap, status: 'loading', error: null }
@@ -426,7 +498,10 @@ window.__ModuleLoader__.load({
       const operation = requestJson(`/model-billing/usage?sessionId=${encodeURIComponent(sessionId)}`)
         .then((data) => {
           if (generation !== slot.generation) return
-          slot.snap = { status: 'ready', data, error: null }
+          // Index once per fetch rather than scanning the row list on every
+          // turn render.
+          slot.snap = { status: 'ready', data, rowsByTurn: indexRowsByTurn(data), error: null }
+          slot.rowsByTurn = slot.snap.rowsByTurn
           emitUsage(slot)
         })
         .catch((error) => {
@@ -434,6 +509,7 @@ window.__ModuleLoader__.load({
           slot.snap = {
             status: 'error',
             data: slot.snap.data,
+            rowsByTurn: slot.snap.rowsByTurn,
             error: error instanceof Error ? error.message : String(error),
           }
           emitUsage(slot)
@@ -445,8 +521,17 @@ window.__ModuleLoader__.load({
       return operation
     }
 
+    function indexRowsByTurn(data) {
+      const index = new Map()
+      if (Array.isArray(data?.usage?.turns)) {
+        for (const row of data.usage.turns) index.set(row.turn, row)
+      }
+      return index
+    }
+
     function useSessionUsage(sessionId, revision) {
       const slot = usageSlot(sessionId)
+      useEffect(() => () => releaseSlot(sessionId, slot), [sessionId, slot])
       const snap = useSyncExternalStore(
         (listener) => {
           slot.listeners.add(listener)
@@ -498,11 +583,16 @@ window.__ModuleLoader__.load({
       return String(Number(value.toFixed(6)))
     }
 
-    function PriceLines({ pricing, translate }) {
+    function PriceLines({ pricing, translate, showSource = true }) {
+      const source = showSource === false ? null : pricing?.source === 'official'
+        ? translate('priceSourceOfficial')
+        : pricing?.source === 'user' ? translate('priceSourceCustom') : null
+      const sourceLine = source === null ? null : h('div', { className: 'mb-picker-price-source' }, source)
       if (pricing?.builtin === true) {
         const line = (label, prices) =>
           `${label} ${translate('priceHitShort')} ${formatPrice(prices?.cacheHit)} · ${translate('priceMissShort')} ${formatPrice(prices?.cacheMiss)} · ${translate('priceOutShort')} ${formatPrice(prices?.output)} ${translate('priceUnit')}`
         return h('div', { className: 'mb-picker-prices' },
+          sourceLine,
           h('div', { className: 'mb-picker-price-line' }, line(translate('peak'), pricing.peak)),
           h('div', { className: 'mb-picker-price-line' }, line(translate('offPeak'), pricing.offPeak)))
       }
@@ -512,6 +602,7 @@ window.__ModuleLoader__.load({
         return h('div', { className: 'mb-picker-prices' }, translate('priceUnset'))
       }
       return h('div', { className: 'mb-picker-prices' },
+        sourceLine,
         h('div', { className: 'mb-picker-price-line' },
           `${translate('priceHitShort')} ${formatPrice(pricing.cacheHit)} · ${translate('priceMissShort')} ${formatPrice(pricing.cacheMiss)} · ${translate('priceOutShort')} ${formatPrice(pricing.output)} ${translate('priceUnit')}`))
     }
@@ -559,6 +650,7 @@ window.__ModuleLoader__.load({
       .mb-price-group { border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; padding: 10px 12px 12px; }
       .mb-price-group-title { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; font-weight: 600; }
       .mb-price-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .mb-card-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
       .mb-field { display: grid; gap: 4px; min-width: 0; }
       .mb-field-label { color: var(--dsw-alias-label-secondary); font-size: 11px; }
       .mb-input { width: 100%; height: 30px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
@@ -621,6 +713,25 @@ window.__ModuleLoader__.load({
       .mb-check.is-disabled { opacity: .55; cursor: default; }
       .mb-check input { width: 15px; height: 15px; accent-color: var(--dsw-alias-brand-primary); }
       .mb-display-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 12px; }
+      .mb-archive-list { display: flex; flex-direction: column; gap: 8px; }
+      .mb-archive-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+      .mb-archive-row .mb-archive-provider { grid-column: 1; grid-row: 1; min-width: 0; }
+      .mb-archive-row .mb-archive-model { grid-column: 2; grid-row: 1; min-width: 0; }
+      .mb-archive-row > .mb-btn { grid-column: 3; grid-row: 1; }
+      .mb-archive-row .mb-archive-price { grid-row: 2; min-width: 0; }
+      .mb-route-editor { display: flex; flex-wrap: wrap; }
+      .mb-route-editor .mb-input { flex: 1 1 120px; min-width: 110px; }
+      .mb-route-editor .mb-btn { flex: 0 0 auto; }
+      .mb-archive-actions { display: flex; gap: 8px; margin-top: 10px; }
+      .mb-master { display: flex; align-items: center; gap: 10px; padding: 10px 0 4px; font-size: 15px; font-weight: 600; cursor: pointer; }
+      .mb-master input { width: 16px; height: 16px; flex: 0 0 auto; }
+      .mb-master-label { line-height: 1.4; }
+      .mb-master-hint { color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 400; }
+      .mb-subchecks { margin: 2px 0 0 26px; }
+      .mb-tag.is-muted { color: var(--dsw-alias-label-secondary); }
+      @media (max-width: 720px) {
+        .mb-subchecks { margin-left: 18px; }
+      }
       .mb-select { height: 30px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 0 8px; font: inherit; }
       .mb-select:focus { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -1px; }
       .mb-picker { position: relative; display: flex; min-width: 0; }
@@ -647,6 +758,7 @@ window.__ModuleLoader__.load({
       .mb-picker-model { color: inherit; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 400; line-height: 20px; overflow: hidden; }
       .mb-picker-prices { color: var(--dsw-alias-label-caption, var(--dsw-alias-label-secondary)); font-size: 11px; line-height: 17px; font-variant-numeric: tabular-nums; }
       .mb-picker-price-line { white-space: normal; overflow-wrap: anywhere; }
+      .mb-picker-price-source { margin-bottom: 2px; color: var(--dsw-alias-label-secondary); font-weight: 600; }
       .mb-picker-check { color: var(--dsw-alias-label-primary); flex: 0 0 14px; place-items: center; display: grid; font-size: 12px; }
       .mb-picker-check svg { width: 14px; height: 14px; }
       .mb-picker-empty { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); padding: 8px; font-size: 12px; line-height: 18px; }
@@ -667,8 +779,23 @@ window.__ModuleLoader__.load({
       }
     `
 
+    const STYLE_MARKER = 'data-dsh-model-billing'
+
+    // The stylesheet belongs to the plugin, not to any one surface, so inject it
+    // once into <head> instead of rendering a copy per settings page, dock,
+    // panel and picker.
+    function ensureStylesheet() {
+      if (typeof document === 'undefined') return
+      if (document.head.querySelector(`style[${STYLE_MARKER}]`) !== null) return
+      const style = document.createElement('style')
+      style.setAttribute(STYLE_MARKER, '')
+      style.textContent = CSS
+      document.head.appendChild(style)
+    }
+
     function Style() {
-      return h('style', null, CSS)
+      ensureStylesheet()
+      return null
     }
 
     // ---------------------------------------------------------------------
@@ -702,6 +829,14 @@ window.__ModuleLoader__.load({
       }))
     }
 
+    function toDraftArchive(entries) {
+      return (entries ?? []).map((entry) => ({
+        provider: entry.provider,
+        model: entry.model,
+        pricing: toDraftPricing(entry.pricing),
+      }))
+    }
+
     function parsePriceInput(value) {
       if (typeof value === 'string' && value.trim() === '') return null
       const number = Number(value)
@@ -713,6 +848,7 @@ window.__ModuleLoader__.load({
       const translate = useT()
       const snap = useCatalog()
       const [draft, setDraft] = useState(null)
+      const [archive, setArchive] = useState(null)
       const [display, setDisplay] = useState(null)
       const [dirty, setDirty] = useState(false)
       const [saving, setSaving] = useState(false)
@@ -721,11 +857,13 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (snap.data === null) return
         setDraft(toDraft(snap.data.models))
+        setArchive(toDraftArchive(snap.data.pricingArchive))
         setDisplay(readDisplay(snap.data))
         setDirty(false)
       }, [snap.data])
 
       const models = draft ?? []
+      const archiveRows = archive ?? []
       const update = (index, change) => {
         setDraft((current) => current === null ? current : current.map((entry, at) => at === index ? change(entry) : entry))
         setDirty(true)
@@ -737,6 +875,29 @@ window.__ModuleLoader__.load({
           ...entry,
           pricing: { ...entry.pricing, [field]: value },
         }))
+      }
+
+      // "Custom prices" starts from blank fields; the user opts in explicitly.
+      const resetPricing = (index) => {
+        update(index, (entry) => ({
+          ...entry,
+          pricing: { cacheHit: '', cacheMiss: '', output: '' },
+        }))
+      }
+
+      // "Restore official prices" puts the built-in peak/off-peak card back
+      // immediately, so the user sees the official table before saving.
+      const restoreOfficialPricing = (index) => {
+        const entry = models[index]
+        if (entry === undefined) return
+        const catalogRow = (snap.data?.models ?? []).find((row) =>
+          row.provider === entry.provider && row.model === entry.model)
+        const official = catalogRow?.pricing?.official
+          ?? (catalogRow?.pricing?.builtin === true ? catalogRow.pricing : null)
+        const restored = official?.builtin === true
+          ? toDraftPricing(official)
+          : { cacheHit: '', cacheMiss: '', output: '' }
+        update(index, (current) => ({ ...current, pricing: restored }))
       }
 
       const move = (index, delta) => {
@@ -753,11 +914,33 @@ window.__ModuleLoader__.load({
         setStatus(null)
       }
 
+      const updateArchive = (index, change) => {
+        setArchive((current) => current === null ? current : current.map((entry, at) => at === index ? change(entry) : entry))
+        setDirty(true)
+        setStatus(null)
+      }
+
+      const updateArchivePrice = (index, field, value) => {
+        updateArchive(index, (entry) => ({ ...entry, pricing: { ...entry.pricing, [field]: value } }))
+      }
+
+      const addArchive = () => {
+        setArchive((current) => [...(current ?? []), { provider: '', model: '', pricing: { cacheHit: '', cacheMiss: '', output: '' } }])
+        setDirty(true)
+        setStatus(null)
+      }
+
+      const removeArchive = (index) => {
+        setArchive((current) => current === null ? current : current.filter((entry, at) => at !== index))
+        setDirty(true)
+        setStatus(null)
+      }
+
       const reset = () => {
-        clearStoredDisplay()
         emitCatalog()
         if (snap.data !== null) {
           setDraft(toDraft(snap.data.models))
+          setArchive(toDraftArchive(snap.data.pricingArchive))
           setDisplay(readDisplay(snap.data))
         }
         setDirty(false)
@@ -772,12 +955,22 @@ window.__ModuleLoader__.load({
         setStatus(null)
       }
 
+      const masterToggle = (field, label, hint) => h('label', { className: 'mb-master' },
+        h('input', {
+          type: 'checkbox',
+          checked: displayValue[field] === true,
+          onChange: (event) => updateDisplay({ [field]: event.target.checked }),
+        }),
+        h('span', { className: 'mb-master-label' }, translate(label)),
+        hint === undefined ? null : h('span', { className: 'mb-master-hint' }, hint))
+
       const renderDisplaySettings = () => h(Fragment, null,
         h('div', { className: 'mb-display' },
           h('div', { className: 'mb-display-head' },
             h('div', { className: 'mb-display-title' }, translate('displaySection')),
             h('div', { className: 'mb-display-hint' }, translate('displayHint'))),
-          h('div', { className: 'mb-check-grid' },
+          masterToggle('showTurnTail', 'displayTurnTail'),
+          h('div', { className: 'mb-check-grid mb-subchecks' },
             [
               ['showProvider', 'displayProvider'],
               ['showModels', 'displayModels'],
@@ -785,17 +978,21 @@ window.__ModuleLoader__.load({
               ['showTokens', 'displayTokens'],
               ['showCacheHit', 'displayCacheHit'],
               ['showLabels', 'displayLabels'],
-            ].map(([field, label]) => h('label', {
-              className: `mb-check${field === 'showProvider' && displayValue.showModels !== true ? ' is-disabled' : ''}`,
-              key: field,
-            },
-              h('input', {
-                type: 'checkbox',
-                checked: displayValue[field] === true,
-                disabled: field === 'showProvider' && displayValue.showModels !== true,
-                onChange: (event) => updateDisplay({ [field]: event.target.checked }),
-              }),
-              h('span', null, translate(label))))),
+            ].map(([field, label]) => {
+              const disabled = displayValue.showTurnTail !== true ||
+                (field === 'showProvider' && displayValue.showModels !== true)
+              return h('label', {
+                className: `mb-check${disabled ? ' is-disabled' : ''}`,
+                key: field,
+              },
+                h('input', {
+                  type: 'checkbox',
+                  checked: displayValue[field] === true,
+                  disabled,
+                  onChange: (event) => updateDisplay({ [field]: event.target.checked }),
+                }),
+                h('span', null, translate(label)))
+            })),
           h('div', { className: 'mb-display-controls' },
             h('label', { className: 'mb-field' },
               h('span', { className: 'mb-field-label' }, translate('displayFontSize')),
@@ -827,6 +1024,20 @@ window.__ModuleLoader__.load({
                 h('option', { value: 'bold' }, translate('weightBold')))))),
         h('div', { className: 'mb-display' },
           h('div', { className: 'mb-display-head' },
+            h('div', { className: 'mb-display-title' }, translate('dockSection')),
+            h('div', { className: 'mb-display-hint' }, translate('dockHint'))),
+          masterToggle('showDock', 'displayDock'),
+          h('div', { className: 'mb-check-grid mb-subchecks' },
+            h('label', { className: `mb-check${displayValue.showDock === true ? '' : ' is-disabled'}` },
+              h('input', {
+                type: 'checkbox',
+                checked: displayValue.showUnpricedNotice === true,
+                disabled: displayValue.showDock !== true,
+                onChange: (event) => updateDisplay({ showUnpricedNotice: event.target.checked }),
+              }),
+              h('span', null, translate('showUnpricedNotice'))))),
+        h('div', { className: 'mb-display' },
+          h('div', { className: 'mb-display-head' },
             h('div', { className: 'mb-display-title' }, translate('pickerSection')),
             h('div', { className: 'mb-display-hint' }, translate('takeoverHint'))),
           h('label', { className: 'mb-check' },
@@ -837,6 +1048,45 @@ window.__ModuleLoader__.load({
             }),
             h('span', null, translate('takeoverPicker')))))
 
+      const renderArchive = () => h('div', { className: 'mb-display' },
+        h('div', { className: 'mb-display-head' },
+          h('div', { className: 'mb-display-title' }, translate('archiveSection')),
+          h('div', { className: 'mb-display-hint' }, translate('archiveHint'))),
+        archiveRows.length === 0
+          ? h('div', { className: 'mb-muted' }, translate('archiveEmpty'))
+          : h('div', { className: 'mb-archive-list' },
+            archiveRows.map((entry, index) => h('div', { className: 'mb-archive-row', key: index },
+              h('input', {
+                className: 'mb-input mb-archive-provider',
+                placeholder: translate('archiveProvider'),
+                value: entry.provider,
+                onChange: (event) => updateArchive(index, (current) => ({ ...current, provider: event.target.value })),
+              }),
+              h('input', {
+                className: 'mb-input mb-archive-model',
+                placeholder: translate('archiveModel'),
+                value: entry.model,
+                onChange: (event) => updateArchive(index, (current) => ({ ...current, model: event.target.value })),
+              }),
+              ...PRICE_FIELDS.map((field) => h('input', {
+                key: field,
+                className: 'mb-input mb-archive-price',
+                inputMode: 'decimal',
+                placeholder: translate(PRICE_LABEL_KEYS[field]),
+                'aria-label': translate(PRICE_LABEL_KEYS[field]),
+                value: entry.pricing[field] ?? '',
+                onChange: (event) => updateArchivePrice(index, field, event.target.value),
+              })),
+              h('button', {
+                type: 'button',
+                className: 'mb-btn',
+                title: translate('remove'),
+                'aria-label': translate('remove'),
+                onClick: () => removeArchive(index),
+              }, translate('remove'))))),
+        h('div', { className: 'mb-archive-actions' },
+          h('button', { type: 'button', className: 'mb-btn', onClick: addArchive }, translate('addArchive'))))
+
       const save = async () => {
         if (draft === null) return
         const payload = []
@@ -846,6 +1096,12 @@ window.__ModuleLoader__.load({
             continue
           }
           const pricing = {}
+          const blank = PRICE_FIELDS.every((field) => String(entry.pricing[field] ?? '').trim() === '')
+          if (blank) {
+            // Three blank fields mean "drop the override", so the official table applies again.
+            payload.push({ provider: entry.provider, model: entry.model, pricing: {} })
+            continue
+          }
           for (const field of PRICE_FIELDS) {
             const parsed = parsePriceInput(entry.pricing[field])
             if (parsed === undefined) {
@@ -856,15 +1112,44 @@ window.__ModuleLoader__.load({
           }
           payload.push({ provider: entry.provider, model: entry.model, pricing })
         }
+        const archivePayload = []
+        const currentKeys = new Set(draft.map((entry) => `${entry.provider}\u0000${entry.model}`))
+        for (const entry of archiveRows) {
+          const provider = entry.provider.trim()
+          const model = entry.model.trim()
+          if (provider === '' && model === '') continue
+          if (provider === '' || model === '') {
+            setStatus({ tone: 'error', text: translate('invalidRoute') })
+            return
+          }
+          if (currentKeys.has(`${provider}\u0000${model}`)) {
+            setStatus({ tone: 'error', text: translate('archiveConflict') })
+            return
+          }
+          const pricing = {}
+          const blank = PRICE_FIELDS.every((field) => String(entry.pricing[field] ?? '').trim() === '')
+          if (blank) {
+            archivePayload.push({ provider, model, pricing: {} })
+            continue
+          }
+          for (const field of PRICE_FIELDS) {
+            const parsed = parsePriceInput(entry.pricing[field])
+            if (parsed === undefined) {
+              setStatus({ tone: 'error', text: translate('invalidPrice') })
+              return
+            }
+            pricing[field] = parsed
+          }
+          archivePayload.push({ provider, model, pricing })
+        }
         setSaving(true)
         setStatus(null)
         try {
           await requestJson('/model-billing/save', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ models: payload, display: displayValue }),
+            body: JSON.stringify({ models: payload, pricingArchive: archivePayload, display: displayValue }),
           })
-          writeStoredDisplay(displayValue)
           setDirty(false)
           setStatus({ tone: 'success', text: translate('saved') })
           await ensureCatalog(true)
@@ -896,13 +1181,25 @@ window.__ModuleLoader__.load({
             h('p', { className: 'mb-muted' }, translate('loading'))))
       }
 
+      const renderToolbar = () => h('div', { className: 'mb-toolbar' },
+        h('span', { className: 'mb-muted' }, translate('modelsCount', { count: models.length })),
+        h('span', { className: 'mb-spacer' }),
+        dirty ? h('span', { className: 'mb-muted' }, translate('unsaved')) : null,
+        h('button', { type: 'button', className: 'mb-btn', disabled: !dirty || saving, onClick: reset }, translate('undo')),
+        h('button', { type: 'button', className: 'mb-btn mb-btn-primary', disabled: !dirty || saving, onClick: () => void save() }, saving ? translate('saving') : translate('save')))
+
       if (models.length === 0) {
+        // The display controls stay editable with no models configured, so the
+        // toolbar (and its save button) must still render here.
         return h(Fragment, null,
           h(Style),
           h('section', { className: 'mb-page' },
             h('h2', { className: 'mb-title' }, translate('title')),
             h('p', { className: 'mb-intro' }, translate('intro')),
+            renderToolbar(),
+            status === null ? null : h('div', { className: 'mb-status', 'data-tone': status.tone, role: 'status' }, status.text),
             renderDisplaySettings(),
+            renderArchive(),
             h('div', { className: 'mb-empty' }, translate('noModels'))))
       }
 
@@ -911,12 +1208,7 @@ window.__ModuleLoader__.load({
         h('section', { className: 'mb-page' },
           h('h2', { className: 'mb-title' }, translate('title')),
           h('p', { className: 'mb-intro' }, translate('intro')),
-          h('div', { className: 'mb-toolbar' },
-            h('span', { className: 'mb-muted' }, translate('modelsCount', { count: models.length })),
-            h('span', { className: 'mb-spacer' }),
-            dirty ? h('span', { className: 'mb-muted' }, translate('unsaved')) : null,
-            h('button', { type: 'button', className: 'mb-btn', disabled: !dirty || saving, onClick: reset }, translate('undo')),
-            h('button', { type: 'button', className: 'mb-btn mb-btn-primary', disabled: !dirty || saving, onClick: () => void save() }, saving ? translate('saving') : translate('save'))),
+          renderToolbar(),
           status === null ? null : h('div', { className: 'mb-status', 'data-tone': status.tone, role: 'status' }, status.text),
           renderDisplaySettings(),
           h('p', { className: 'mb-note' }, translate('orderHint')),
@@ -929,15 +1221,19 @@ window.__ModuleLoader__.load({
               translate,
               onMove: move,
               onUpdatePrice: updatePrice,
+              onResetPricing: resetPricing,
+              onRestoreOfficial: restoreOfficialPricing,
             }))),
+          renderArchive(),
           h('p', { className: 'mb-footer-note' }, translate('formula')),
           h('p', { className: 'mb-footer-note' }, translate('formulaNote'))))
     }
 
-    function SettingsModelCard({ entry, index, count, translate, onMove, onUpdatePrice }) {
+    function SettingsModelCard({ entry, index, count, translate, onMove, onUpdatePrice, onResetPricing, onRestoreOfficial }) {
       const id = useId()
       const pricing = entry.pricing
       const builtin = pricing.builtin === true
+      const custom = entry.isDeepSeek && !builtin
       const fields = builtin ? null : PRICE_FIELDS.map((field) => {
         const inputId = `${id}-${field}`
         return h('label', { className: 'mb-field', htmlFor: inputId, key: field },
@@ -984,12 +1280,23 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mb-price-group' },
             h('div', { className: 'mb-price-group-title' },
               h('span', null, builtin ? translate('officialPrice') : translate('singlePrice')),
+              custom ? h('span', { className: 'mb-tag' }, translate('priceSourceCustom')) : null,
               h('span', { className: 'mb-muted', style: { fontWeight: 400, fontSize: '11px' } }, translate('perMillion'))),
             builtin
               ? h(Fragment, null,
-                h(PriceLines, { pricing, translate }),
+                h(PriceLines, { pricing, translate, showSource: false }),
                 h('p', { className: 'mb-note' }, translate('deepseekSchedule')))
-              : h('div', { className: 'mb-price-grid' }, fields))))
+              : h(Fragment, null,
+                h('div', { className: 'mb-price-grid' }, fields),
+                custom ? h('p', { className: 'mb-note' }, translate('customPriceNote')) : null),
+            entry.isDeepSeek
+              ? h('div', { className: 'mb-card-actions' },
+                h('button', {
+                  type: 'button',
+                  className: 'mb-btn',
+                  onClick: () => builtin ? onResetPricing(index) : onRestoreOfficial(index),
+                }, builtin ? translate('customizePrice') : translate('useOfficialPrice')))
+              : null)))
     }
 
     // ---------------------------------------------------------------------
@@ -1004,6 +1311,10 @@ window.__ModuleLoader__.load({
       const catalogSnap = useCatalog()
       const [open, setOpen] = useState(false)
       const [panelPos, setPanelPos] = useState(null)
+      const [editingRoute, setEditingRoute] = useState(null)
+      const [editPrices, setEditPrices] = useState({ cacheHit: '', cacheMiss: '', output: '' })
+      const [savingPrice, setSavingPrice] = useState(false)
+      const [priceStatus, setPriceStatus] = useState(null)
       const triggerRef = useRef(null)
       const panelRef = useRef(null)
 
@@ -1052,25 +1363,74 @@ window.__ModuleLoader__.load({
         }
         document.addEventListener('mousedown', closeOutside)
         document.addEventListener('keydown', closeOnEscape)
+        // A dialog must take focus when it opens so keyboard users land inside it.
+        panelRef.current?.focus()
         return () => {
           document.removeEventListener('mousedown', closeOutside)
           document.removeEventListener('keydown', closeOnEscape)
         }
       }, [open])
 
+      // Hooks must run on every render, so derive the catalog indexes before any
+      // early return; React rejects a different hook count between renders.
+      const orderIndex = useMemo(() =>
+        new Map((catalogSnap.data?.models ?? []).map((model) => [`${model.provider}\u0000${model.model}`, model.order])),
+      [catalogSnap.data])
+      const catalogByKey = useMemo(() =>
+        new Map((catalogSnap.data?.models ?? []).map((model) => [`${model.provider}\u0000${model.model}`, model])),
+      [catalogSnap.data])
+
+      const display = readDisplay(catalogSnap.data)
+      if (display.showDock === false) return null
+
       const data = usage.data
       if (data === null || data === undefined || data.totals?.hasBillable !== true) {
         return null
       }
       const totals = data.totals
+      const unpricedRoutes = data.unpricedRoutes ?? []
+      const beginRouteEdit = (route) => {
+        setEditingRoute(`${route.provider}\u0000${route.model}`)
+        setEditPrices({ cacheHit: '', cacheMiss: '', output: '' })
+        setPriceStatus(null)
+      }
+      const saveRoutePrice = async (route) => {
+        const pricing = {}
+        for (const field of PRICE_FIELDS) {
+          const parsed = parsePriceInput(editPrices[field])
+          if (parsed === undefined || parsed === null) {
+            setPriceStatus({ tone: 'error', text: translate('invalidPrice') })
+            return
+          }
+          pricing[field] = parsed
+        }
+        setSavingPrice(true)
+        setPriceStatus(null)
+        try {
+          await requestJson('/model-billing/save', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ pricingArchive: [{ provider: route.provider, model: route.model, pricing }] }),
+          })
+          await ensureCatalog(true)
+          setEditingRoute(null)
+          setPriceStatus({ tone: 'success', text: translate('priceSaved') })
+          await ensureUsage(sessionId, revision, true)
+        } catch (error) {
+          setPriceStatus({ tone: 'error', text: translate('saveFailed', { message: error instanceof Error ? error.message : String(error) }) })
+        } finally {
+          setSavingPrice(false)
+        }
+      }
       const last = [...(data.turns ?? [])].reverse().find((entry) => entry.hasBillable) ?? null
       const totalText = totals.costKnown
         ? `≈ ${formatMoney(totals.cost)}`
-        : totals.pricedAttempts > 0 ? `≈ ${formatMoney(totals.cost)}*` : translate('pricePlaceholder')
+        : totals.pricedAttempts > 0 ? `≈ ${formatMoney(totals.cost)}` : translate('pricePlaceholder')
       const lastText = last === null || last === undefined || !last.hasBillable
         ? null
-        : last.costKnown ? `≈ ${formatMoney(last.cost)}` : last.pricedAttempts > 0 ? `≈ ${formatMoney(last.cost)}*` : translate('pricePlaceholder')
-      const orderIndex = new Map((catalogSnap.data?.models ?? []).map((model) => [`${model.provider}\u0000${model.model}`, model.order]))
+        : last.costKnown ? `≈ ${formatMoney(last.cost)}` : last.pricedAttempts > 0 ? `≈ ${formatMoney(last.cost)}` : translate('pricePlaceholder')
+      // Rebuilding the index and scanning the catalog on every render gets
+      // expensive on a long session, so both indexes are memoized above.
       const byModel = [...(data.byModel ?? [])].sort((left, right) => {
         const leftKey = left.provider === null ? '' : `${left.provider}\u0000${left.model}`
         const rightKey = right.provider === null ? '' : `${right.provider}\u0000${right.model}`
@@ -1078,7 +1438,9 @@ window.__ModuleLoader__.load({
       })
 
       const modelNameOf = (model) => {
-        const catalogRow = catalogSnap.data?.models?.find((entry) => entry.provider === model?.provider && entry.model === model?.model)
+        const catalogRow = model?.provider === null || model?.provider === undefined
+          ? undefined
+          : catalogByKey.get(`${model.provider}\u0000${model.model}`)
         return catalogRow?.name ?? model?.name ?? model?.model ?? '—'
       }
       const turnModelNames = (turn) => {
@@ -1103,7 +1465,7 @@ window.__ModuleLoader__.load({
       const turnRows = [...(data.turns ?? [])].reverse().slice(0, 20).map((turn) => {
         const costText = turn.costKnown
           ? `≈ ${formatMoney(turn.cost)}`
-          : turn.pricedAttempts > 0 ? `≈ ${formatMoney(turn.cost)}*` : translate('pricePlaceholder')
+          : turn.pricedAttempts > 0 ? `≈ ${formatMoney(turn.cost)}` : translate('pricePlaceholder')
         const modelNames = turnModelNames(turn)
         const modelText = modelNames.length === 0
           ? '—'
@@ -1122,7 +1484,9 @@ window.__ModuleLoader__.load({
         h('table', { className: 'mb-table mb-turn-table' }, header, h('tbody', null, turnRows)))
 
       const modelRows = byModel.map((model) => {
-        const catalogRow = catalogSnap.data?.models?.find((entry) => entry.provider === model.provider && entry.model === model.model)
+        const catalogRow = model.provider === null
+          ? undefined
+          : catalogByKey.get(`${model.provider}\u0000${model.model}`)
         const modelName = catalogRow === undefined ? model.name : `${catalogRow.providerName} / ${catalogRow.name}`
         return h('tr', { key: `${model.provider}\u0000${model.model}\u0000${model.name}` },
           h('td', null,
@@ -1141,6 +1505,49 @@ window.__ModuleLoader__.load({
           h('div', { style: { overflowX: 'auto' } },
             h('table', { className: 'mb-table' }, h('tbody', null, modelRows))))
 
+      const editingRouteRow = editingRoute === null
+        ? null
+        : unpricedRoutes.find((route) => `${route.provider}\u0000${route.model}` === editingRoute) ?? null
+      const routeEditor = editingRouteRow === null
+        ? null
+        : h('div', { className: 'mb-archive-row mb-route-editor', style: { marginTop: '8px' } },
+          h('span', { className: 'mb-muted' }, `${editingRouteRow.provider} / ${editingRouteRow.model}`),
+          ...PRICE_FIELDS.map((field) => h('input', {
+            key: field,
+            className: 'mb-input',
+            inputMode: 'decimal',
+            placeholder: translate(PRICE_LABEL_KEYS[field]),
+            'aria-label': translate(PRICE_LABEL_KEYS[field]),
+            value: editPrices[field],
+            onChange: (event) => setEditPrices((current) => ({ ...current, [field]: event.target.value })),
+          })),
+          h('button', {
+            type: 'button',
+            className: 'mb-btn mb-btn-primary',
+            disabled: savingPrice,
+            onClick: () => void saveRoutePrice(editingRouteRow),
+          }, savingPrice ? translate('saving') : translate('save')))
+
+      const unpricedTable = unpricedRoutes.length === 0 || display.showUnpricedNotice === false
+        ? null
+        : h('div', { style: { marginTop: '10px' } },
+          h('div', { className: 'mb-panel-title', style: { fontSize: '12px', marginBottom: '4px' } }, translate('unpricedRoutes')),
+          h('div', { style: { overflowX: 'auto' } },
+            h('table', { className: 'mb-table' },
+              h('tbody', null, unpricedRoutes.map((route) => h('tr', { key: `${route.provider}\u0000${route.model}` },
+                h('td', null, `${route.provider} / ${route.model}`),
+                h('td', { className: 'num' }, String(route.attempts)),
+                h('td', { className: 'num', style: { color: 'var(--dsw-alias-label-secondary)' } },
+                  `${formatTokens(route.promptTokens)} / ${formatTokens(route.outputTokens)}`),
+                h('td', { className: 'num' },
+                  h('button', {
+                    type: 'button',
+                    className: 'mb-btn',
+                    onClick: () => beginRouteEdit(route),
+                  }, translate('addPrice')))))))),
+          routeEditor,
+          priceStatus === null ? null : h('div', { className: 'mb-status', 'data-tone': priceStatus.tone, role: 'status' }, priceStatus.text))
+
       const panelStyle = panelPos === null
         ? { left: 0, top: 0, width: 660, visibility: 'hidden' }
         : {
@@ -1155,6 +1562,7 @@ window.__ModuleLoader__.load({
         className: 'mb-panel mb-panel-floating',
         style: panelStyle,
         role: 'dialog',
+        'aria-modal': true,
         'aria-label': translate('costDetails'),
         tabIndex: -1,
       },
@@ -1185,8 +1593,11 @@ window.__ModuleLoader__.load({
           summaryItem(translate('tokens'), `${formatTokens(totals.promptTokens)} / ${formatTokens(totals.outputTokens)}`)),
         turnTable,
         modelTable,
+        unpricedTable,
         h('p', { className: 'mb-panel-note' }, translate('estimateNote')),
-        totals.partial ? h('p', { className: 'mb-warn' }, translate('partialNote')) : null)
+        totals.partial && display.showUnpricedNotice
+          ? h('p', { className: 'mb-warn' }, translate('partialNote'))
+          : null)
 
       return h('div', { className: 'mb-dock' },
         h(Style),
@@ -1214,7 +1625,7 @@ window.__ModuleLoader__.load({
           lastText === null ? null : h(Fragment, null,
             h('span', { className: 'mb-dock-sep' }, '·'),
             h('span', null, `${translate('thisTurn')} ${lastText}`)),
-          totals.partial ? h('span', { className: 'mb-warn', style: { margin: 0 } }, translate('partial')) : null),
+          totals.partial && display.showUnpricedNotice ? h('span', { className: 'mb-warn', style: { margin: 0 } }, translate('partial')) : null),
         open ? ReactDOM.createPortal(panel, document.body) : null)
     }
 
@@ -1268,12 +1679,16 @@ window.__ModuleLoader__.load({
       const tokenUsage = typeof useProjection === 'function' ? useProjection('tokenUsage') : undefined
       const revision = tokenUsageRevision(tokenUsage)
       const usage = useSessionUsage(sessionId, revision)
+      // The master switch hides the whole chip while the per-field switches keep
+      // their saved values, so turning it back on restores the previous layout.
+      if (display.showTurnTail === false) return null
       const rows = usage.data?.turns
-      const row = rows?.find((entry) => entry.turn === turnNumber)
+      const row = (usage.rowsByTurn instanceof Map ? usage.rowsByTurn.get(turnNumber) : undefined) ??
+        rows?.find((entry) => entry.turn === turnNumber)
       if (row === undefined) return null
       const costText = row.costKnown
         ? `≈ ${formatMoney(row.cost)}`
-        : row.pricedAttempts > 0 ? `≈ ${formatMoney(row.cost)}*` : translate('pricePlaceholder')
+        : row.pricedAttempts > 0 ? `≈ ${formatMoney(row.cost)}` : translate('pricePlaceholder')
       const modelText = turnModelText(row.models, translate, display.showProvider === true, catalogSnap.data?.models)
       const label = (key) => display.showLabels ? `${translate(key)} ` : ''
       const parts = []
@@ -1334,6 +1749,8 @@ window.__ModuleLoader__.load({
       const [selecting, setSelecting] = useState(false)
       const [failure, setFailure] = useState(null)
       const [menuPos, setMenuPos] = useState(null)
+      // Roving cursor for arrow-key navigation inside the model list.
+      const [activeIndex, setActiveIndex] = useState(0)
       const rootRef = useRef(null)
       const triggerRef = useRef(null)
       const menuRef = useRef(null)
@@ -1469,6 +1886,9 @@ window.__ModuleLoader__.load({
         if (term === '') return entries
         return entries.filter((entry) => `${entry.model.name} ${entry.group.name}`.toLowerCase().includes(term))
       }, [entries, term])
+      // Keep the roving cursor inside the visible list; a shrunk search result
+      // must not leave the index pointing past the end.
+      const active = filtered.length === 0 ? -1 : Math.min(Math.max(activeIndex, 0), filtered.length - 1)
 
       useLayoutEffect(() => {
         if (!open) {
@@ -1504,11 +1924,13 @@ window.__ModuleLoader__.load({
             searchRef.current?.focus()
             return
           }
-          const first = menuRef.current?.querySelector('.mb-picker-row:not(:disabled)')
-          if (first instanceof HTMLElement) first.focus()
+          const rows = menuRef.current?.querySelectorAll('.mb-picker-row')
+          const target = rows?.[active]
+          if (target instanceof HTMLElement) target.focus()
         }, 0)
         return () => clearTimeout(timer)
-      }, [open, showSearch])
+        // Focus follows the roving cursor so arrow keys keep focus on the active row.
+      }, [open, showSearch, active])
 
       const loading = catalogSnap.data === null && (state === null || state.status === 'loading')
       const busy = selecting || state?.status === 'selecting'
@@ -1574,6 +1996,9 @@ window.__ModuleLoader__.load({
           return
         }
         setFailure(null)
+        // Open the cursor on the row the user is already using, when there is one.
+        const selectedAt = filtered.findIndex((entry) => entry.group.id === current?.provider && entry.model.id === current?.model)
+        setActiveIndex(selectedAt < 0 ? 0 : selectedAt)
         setOpen(true)
         if (directory !== null) directory.load().catch(() => {})
       }
@@ -1588,6 +2013,47 @@ window.__ModuleLoader__.load({
         }
       const errorText = failure ?? (state?.status === 'error' ? state.error : null)
 
+      // Arrow keys move a roving cursor through the list. Enter and Space are
+      // left to the focused row itself, so a <button> keeps its native
+      // activation and the menu never fires the choice twice.
+      const focusRow = (index) => {
+        const rows = menuRef.current?.querySelectorAll('.mb-picker-row')
+        const target = rows?.[index]
+        if (target instanceof HTMLElement) target.focus()
+      }
+      const moveActive = (delta) => {
+        if (filtered.length === 0) return
+        const next = Math.min(Math.max(active + delta, 0), filtered.length - 1)
+        setActiveIndex(next)
+        focusRow(next)
+      }
+      const onMenuKeyDown = (event) => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          moveActive(1)
+          return
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          moveActive(-1)
+          return
+        }
+        if (event.key === 'Home') {
+          event.preventDefault()
+          if (filtered.length === 0) return
+          setActiveIndex(0)
+          focusRow(0)
+          return
+        }
+        if (event.key === 'End') {
+          event.preventDefault()
+          const last = filtered.length - 1
+          if (last < 0) return
+          setActiveIndex(last)
+          focusRow(last)
+        }
+      }
+
       const menu = h('div', {
         ref: menuRef,
         id: `${id}-menu`,
@@ -1595,6 +2061,7 @@ window.__ModuleLoader__.load({
         style: menuStyle,
         role: 'dialog',
         'aria-label': translate('pickerAria'),
+        onKeyDown: onMenuKeyDown,
       },
         showSearch ? h('input', {
           ref: searchRef,
@@ -1603,11 +2070,21 @@ window.__ModuleLoader__.load({
           value: query,
           placeholder: translate('searchModel'),
           'aria-label': translate('searchModel'),
-          onChange: (event) => setQuery(event.target.value),
+          onChange: (event) => {
+            setQuery(event.target.value)
+            // A shorter result list must not leave the cursor on a removed row.
+            setActiveIndex(0)
+          },
           onKeyDown: (event) => {
+            // Enter picks the highlighted row; a downward arrow steps into the list.
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              moveActive(1)
+              return
+            }
             if (event.key !== 'Enter' || filtered.length === 0 || busy) return
             event.preventDefault()
-            chooseModel(filtered[0])
+            chooseModel(filtered[active])
           },
         }) : null,
         h('div', { className: 'mb-picker-list', role: 'menu' },
@@ -1626,6 +2103,8 @@ window.__ModuleLoader__.load({
                   className: 'mb-picker-row',
                   'aria-checked': selected ? 'true' : 'false',
                   title: entry.model.name,
+                  // Roving tabindex: only the cursor row is reachable by Tab.
+                  tabIndex: index === active ? 0 : -1,
                   disabled: busy,
                   onClick: () => chooseModel(entry),
                 },
@@ -1719,6 +2198,10 @@ window.__ModuleLoader__.load({
 
     function ModelPickerSeat(props) {
       const catalogSnap = useCatalog()
+      // Take over only while we hold a usable catalog. On a fetch error or an
+      // in-flight load, return null so the built-in picker keeps working
+      // instead of leaving the user with no way to change models.
+      if (catalogSnap.status !== 'ready') return null
       const display = readDisplay(catalogSnap.data)
       if (!display.takeoverPicker) return null
       return h(OrderedModelPicker, props)
@@ -1732,7 +2215,7 @@ window.__ModuleLoader__.load({
         ctx.inject(['modelDirectories'], (scope) => {
           publishModelDirectories(scope.modelDirectories)
           let seat = null
-          const takeoverEnabled = () => readDisplay(catalog.snap.data).takeoverPicker !== false
+          const takeoverEnabled = () => catalog.snap.status === 'ready' && readDisplay(catalog.snap.data).takeoverPicker !== false
           const syncSeat = () => {
             if (takeoverEnabled()) {
               if (seat === null) {

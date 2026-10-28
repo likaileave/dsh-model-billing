@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
 /**
@@ -26,18 +26,21 @@ const MAX_BODY_BYTES = 256 * 1024
 const PRICE_FIELDS = ['cacheHit', 'cacheMiss', 'output']
 const KEY_SEPARATOR = '\u0000'
 const DISPLAY_DEFAULTS = Object.freeze({
+  showTurnTail: true,
+  showDock: true,
   showModels: true,
   showProvider: false,
   showCost: true,
   showTokens: false,
   showCacheHit: false,
   showLabels: true,
+  showUnpricedNotice: true,
   takeoverPicker: true,
   fontSize: 'normal',
   density: 'comfortable',
   fontWeight: 'normal',
 })
-const DISPLAY_FLAGS = ['showModels', 'showProvider', 'showCost', 'showTokens', 'showCacheHit', 'showLabels', 'takeoverPicker']
+const DISPLAY_FLAGS = ['showTurnTail', 'showDock', 'showModels', 'showProvider', 'showCost', 'showTokens', 'showCacheHit', 'showLabels', 'showUnpricedNotice', 'takeoverPicker']
 const DISPLAY_FONT_SIZES = new Set(['small', 'normal', 'large'])
 const DISPLAY_DENSITIES = new Set(['compact', 'comfortable'])
 const DISPLAY_FONT_WEIGHTS = new Set(['normal', 'bold'])
@@ -97,8 +100,21 @@ function statePath() {
   return join(home, 'model-billing.json')
 }
 
+/** How long a provider's model list stays fresh. */
+const CATALOG_TTL_MS = 60_000
+let providerListCache = { at: 0, value: null }
+const modelListCache = new Map()
+const reasoningCache = new Map()
+
+/** Drop every catalog cache so the next lookup hits the adapters again. */
+function invalidateCatalogCache() {
+  providerListCache = { at: 0, value: null }
+  modelListCache.clear()
+  reasoningCache.clear()
+}
+
 /** Look up the model catalog and merge the saved order/prices into it. */
-async function buildCatalog(ctx) {
+async function buildCatalog(ctx, options = {}) {
   const state = await loadState(ctx)
   const llm = ctx.get('llm')
   if (llm === undefined) {
@@ -106,24 +122,49 @@ async function buildCatalog(ctx) {
       ok: true,
       models: [],
       failures: [{ provider: 'llm', message: 'the llm service is not mounted' }],
+      pricingArchive: pricingArchive(state),
       ...stateEnvelope(state),
     }
   }
 
-  const listed = typeof llm.listProviders === 'function' ? llm.listProviders() : []
-  const providers = Array.isArray(listed) ? listed : []
+  const refresh = options?.refresh === true
+  const now = Date.now()
+
+  let providers
+  if (!refresh && providerListCache.value !== null && now - providerListCache.at < CATALOG_TTL_MS) {
+    providers = providerListCache.value
+  } else {
+    const listed = typeof llm.listProviders === 'function' ? llm.listProviders() : []
+    providers = Array.isArray(listed) ? listed : []
+    providerListCache = { at: now, value: providers }
+  }
+
   const settled = await Promise.allSettled(providers.map(async (provider) => {
-    const models = await llm.listModels(provider.id)
-    if (!Array.isArray(models)) throw new Error('the provider returned no model list')
-    const entries = models.filter((model) => typeof model?.id === 'string' && model.id !== '')
+    let cached = refresh ? undefined : modelListCache.get(provider.id)
+    if (cached === undefined || Date.now() - cached.at >= CATALOG_TTL_MS) {
+      const models = await llm.listModels(provider.id)
+      if (!Array.isArray(models)) throw new Error('the provider returned no model list')
+      cached = { at: Date.now(), models }
+      modelListCache.set(provider.id, cached)
+    }
+    const entries = cached.models.filter((model) => typeof model?.id === 'string' && model.id !== '')
     return Promise.all(entries.map(async (model) => {
       let reasoning
       if (typeof llm.resolveModelInfo === 'function') {
-        try {
-          const resolved = await llm.resolveModelInfo(provider.id, model.id)
-          reasoning = publicReasoning(resolved?.reasoning)
-        } catch {
-          // Reasoning metadata is optional; an unavailable adapter must not hide the model.
+        const cacheKey = `${provider.id}\u0000${model.id}`
+        if (!refresh && reasoningCache.has(cacheKey)) {
+          reasoning = reasoningCache.get(cacheKey)
+        } else {
+          try {
+            const resolved = await llm.resolveModelInfo(provider.id, model.id)
+            reasoning = publicReasoning(resolved?.reasoning)
+          } catch {
+            // Reasoning metadata is optional; an unavailable adapter must not hide the model.
+            reasoning = undefined
+          }
+          // Memoized until the next save; a resolution failure is cached too, so a
+          // flapping adapter is not retried on every single catalog request.
+          reasoningCache.set(cacheKey, reasoning)
         }
       }
       return {
@@ -167,6 +208,7 @@ async function buildCatalog(ctx) {
       pricing: catalogPricing(row.provider, row.model, state.pricing[modelKey(row.provider, row.model)]),
     })),
     failures,
+    pricingArchive: pricingArchive(state),
     ...stateEnvelope(state),
   }
 }
@@ -194,10 +236,45 @@ function stateEnvelope(state) {
   }
 }
 
-/** Whether a route is one of the official DeepSeek routes. */
+/**
+ * Prices for routes that are no longer in the configured model list. They stay
+ * in the price book so historical calls remain priced; the settings page edits
+ * them here instead of forcing the user to re-add a retired model to the picker.
+ */
+function pricingArchive(state) {
+  const current = new Set(state.order.map((entry) => modelKey(entry.provider, entry.model)))
+  const rows = []
+  for (const [key, value] of Object.entries(state.pricing)) {
+    if (current.has(key)) continue
+    const at = key.indexOf(KEY_SEPARATOR)
+    if (at <= 0) continue
+    const provider = key.slice(0, at)
+    const model = key.slice(at + KEY_SEPARATOR.length)
+    if (!validRoute(provider, model)) continue
+    rows.push({ provider, model, pricing: { ...publicPricing(value), source: 'user' } })
+  }
+  return rows.sort((left, right) =>
+    left.provider.localeCompare(right.provider) || left.model.localeCompare(right.model))
+}
+
+/**
+ * Whether a provider id belongs to DeepSeek itself. Anchored at the start so a
+ * relay that merely contains the word (`my-deepseek-relay`) is not captured.
+ */
+const OFFICIAL_DEEPSEEK_PROVIDER = /^deepseek(?:$|[-_.])/
+function isOfficialDeepSeekProvider(provider) {
+  return OFFICIAL_DEEPSEEK_PROVIDER.test(String(provider ?? '').trim().toLowerCase())
+}
+
+/** The built-in rate table entry for a model, matched case-insensitively. */
+function builtinRatesFor(model) {
+  const id = String(model ?? '').trim().toLowerCase()
+  return Object.prototype.hasOwnProperty.call(DEEPSEEK_PRICES, id) ? DEEPSEEK_PRICES[id] : undefined
+}
+
+/** Whether a route is an official DeepSeek route with a built-in rate. */
 function isDeepSeekRoute(provider, model) {
-  return String(provider).toLowerCase().includes('deepseek')
-    || String(model).toLowerCase().startsWith('deepseek')
+  return isOfficialDeepSeekProvider(provider) && builtinRatesFor(model) !== undefined
 }
 
 /** Whether one instant falls in DeepSeek's Beijing peak window. */
@@ -212,12 +289,10 @@ function deepseekPeakAt(time) {
   return (hour >= 9 && hour < 12) || (hour >= 14 && hour < 18)
 }
 
-/** The built-in price set for a DeepSeek model at one instant. */
+/** The built-in price set for a DeepSeek model at one instant, or undefined. */
 function deepseekPricingAt(model, time) {
-  const id = String(model ?? '').toLowerCase()
-  const rates = id.includes('pro')
-    ? DEEPSEEK_PRICES['deepseek-v4-pro']
-    : DEEPSEEK_PRICES['deepseek-flash']
+  const rates = builtinRatesFor(model)
+  if (rates === undefined) return undefined
   return deepseekPeakAt(time) ? rates.peak : rates.offPeak
 }
 
@@ -260,21 +335,48 @@ function publicPricing(value) {
 
 /** Official DeepSeek peak/off-peak prices, built in rather than user-edited. */
 function deepseekBuiltinPricing(provider, model) {
-  if (!String(provider).toLowerCase().includes('deepseek')) return null
-  const prices = DEEPSEEK_PRICES[model]
+  if (!isOfficialDeepSeekProvider(provider)) return null
+  const prices = builtinRatesFor(model)
   if (prices === undefined) return null
   return {
     builtin: true,
-    peakEnabled: true,
     peak: { ...prices.peak },
     offPeak: { ...prices.offPeak },
     schedule: DEEPSEEK_PRICING_SCHEDULE,
   }
 }
 
-/** Pricing as presented to the Client: built-in official table or the saved flat prices. */
+/**
+ * The single pricing resolver shared by catalog and usage. A user-supplied price
+ * set always wins; otherwise a DeepSeek route falls back to the built-in official
+ * table, and every other route stays on its saved flat prices.
+ * @returns {{ kind: 'builtin'|'custom'|'flat'|'none', prices: object, complete: boolean, source: 'official'|'user' }}
+ */
+function resolveRoutePricing(provider, model, savedPricing, time) {
+  const saved = publicPricing(savedPricing)
+  if (priceSetComplete(saved)) return { kind: 'custom', prices: saved, complete: true, source: 'user' }
+  const rates = isOfficialDeepSeekProvider(provider) ? builtinRatesFor(model) : undefined
+  if (rates !== undefined) {
+    const prices = deepseekPeakAt(time) ? rates.peak : rates.offPeak
+    return { kind: 'builtin', prices: { ...prices }, complete: priceSetComplete(prices), source: 'official' }
+  }
+  const prices = publicPricing(savedPricing)
+  const complete = priceSetComplete(prices)
+  return { kind: complete ? 'flat' : 'none', prices, complete, source: 'user' }
+}
+
+/** Pricing as presented to the Client: the built-in official table or the saved flat prices. */
 function catalogPricing(provider, model, value) {
-  return deepseekBuiltinPricing(provider, model) ?? publicPricing(value)
+  const resolved = resolveRoutePricing(provider, model, value, Date.now())
+  if (resolved.kind === 'builtin') return { ...deepseekBuiltinPricing(provider, model), source: 'official' }
+  // Keep the official table alongside a custom DeepSeek price so the settings page
+  // can offer "restore official prices" without another round trip.
+  const official = isOfficialDeepSeekProvider(provider) ? deepseekBuiltinPricing(provider, model) : null
+  return {
+    ...resolved.prices,
+    source: 'user',
+    ...official === null ? {} : { official },
+  }
 }
 
 /** A finite non-negative number, or null for "not set". */
@@ -331,11 +433,16 @@ function normalizeUsage(usage, stream) {
     ...cacheWriteTokens === undefined ? [] : [cacheWriteTokens],
   ])
   if (knownPrompt === undefined) return undefined
+  // The three buckets are the authoritative source; a totalTokens that disagrees
+  // with them only marks the row partial. Dropping the whole row would under-report
+  // the session far more than flagging it uncertain.
+  let partial = false
   if (totalTokens !== undefined) {
-    if (!isCount(totalTokens)) return undefined
-    const exactPrompt = totalTokens - outputTokens
-    if (!isCount(exactPrompt) || exactPrompt < knownPrompt) return undefined
-    if (cacheReadTokens !== undefined && cacheWriteTokens !== undefined && exactPrompt !== knownPrompt) return undefined
+    if (isCount(totalTokens)) {
+      const exactPrompt = totalTokens - outputTokens
+      if (!isCount(exactPrompt) || exactPrompt < knownPrompt) partial = true
+      else if (cacheReadTokens !== undefined && cacheWriteTokens !== undefined && exactPrompt !== knownPrompt) partial = true
+    }
   }
   return {
     uncachedInputTokens: inputTokens,
@@ -343,6 +450,7 @@ function normalizeUsage(usage, stream) {
     ...cacheReadTokens === undefined ? {} : { cacheReadTokens },
     ...cacheWriteTokens === undefined ? {} : { cacheWriteTokens },
     ...reasoningTokens === undefined ? {} : { reasoningTokens },
+    ...partial ? { partial: true } : {},
   }
 }
 
@@ -375,9 +483,15 @@ function userTextPreview(message) {
  * sample without a lifecycle route is retained with an unknown route so the UI
  * can report it as unpriced instead of silently dropping tokens.
  */
-function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new Map()) {
+function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new Map(), orderKeys = null) {
   const turns = new Map()
+  // When the caller knows which routes are still configured, an unpriced call can
+  // be split into "needs attention now" and "historical leftovers". Without that
+  // set every unpriced call is historical, which keeps older callers unchanged.
+  const orderSet = orderKeys instanceof Set ? orderKeys : null
+  const unpricedRoutes = new Map()
   let headerRoute
+  let headerAt
   let latestTime = 0
   let currentTurn = null
   let pendingPreview = null
@@ -409,13 +523,16 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     const provider = route?.provider
     const model = route?.model
     const key = provider !== undefined && model !== undefined ? modelKey(provider, model) : undefined
-    const deepseek = provider !== undefined && model !== undefined && isDeepSeekRoute(provider, model)
-    const pricing = deepseek
-      ? deepseekPricingAt(model, time)
-      : key !== undefined ? pricingByKey.get(key) : undefined
-    const effective = pricing ?? defaultPricing()
-    const complete = priceSetComplete(effective)
+    // Peak/off-peak follows the moment the request reached the server, not when
+    // the stream finished — a long request straddling noon stays on its entry rate.
+    const pricedAt = headerAt ?? time
+    const resolved = provider !== undefined && model !== undefined
+      ? resolveRoutePricing(provider, model, key === undefined ? undefined : pricingByKey.get(key), pricedAt)
+      : { kind: 'none', prices: defaultPricing(), complete: false }
+    const effective = resolved.prices
+    const complete = resolved.complete
     const cost = !complete ? 0 : estimateAttemptCost(usage, effective)
+    const deepseek = resolved.kind === 'builtin'
     const attempt = {
       seq: event.seq,
       time,
@@ -424,6 +541,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       name: key === undefined ? null : nameByKey.get(key) ?? null,
       deepseek,
       priced: complete,
+      currentOrder: orderSet === null || key === undefined ? null : orderSet.has(key),
       cost,
       usage,
     }
@@ -445,6 +563,8 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       const turn = event.data?.turn
       if (Number.isSafeInteger(turn)) {
         currentTurn = turn
+        headerRoute = undefined
+        headerAt = undefined
         const entry = ensureTurn(turn, event.time)
         if (!entry.seenUser && pendingPreview !== null) {
           entry.preview = pendingPreview
@@ -473,6 +593,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     }
     if (event?.type === 'request/header') {
       const config = event.data?.header?.config
+      headerAt = Number(event.time) || headerAt
       if (typeof config?.provider === 'string' && typeof config?.model === 'string') {
         headerRoute = { provider: config.provider, model: config.model }
       }
@@ -501,9 +622,12 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     chargeableAttempts: 0,
     pricedAttempts: 0,
     unpricedAttempts: 0,
+    unpricedCurrentAttempts: 0,
+    unpricedHistoricalAttempts: 0,
     cacheReported: false,
     hasBillable: false,
     partial: false,
+    partialCurrent: false,
     costKnown: false,
   }
 
@@ -525,12 +649,16 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       chargeableAttempts: 0,
       pricedAttempts: 0,
       unpricedAttempts: 0,
+      unpricedCurrentAttempts: 0,
+      unpricedHistoricalAttempts: 0,
       cacheReported: false,
       hasBillable: false,
       partial: false,
+      partialCurrent: false,
       costKnown: false,
       models: [...entry.models.values()].sort((left, right) => left.name.localeCompare(right.name)),
     }
+    let usagePartial = false
     for (const attempt of entry.attempts) {
       const usage = attempt.usage
       const prompt = usage.uncachedInputTokens
@@ -542,11 +670,42 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       row.cacheWriteTokens += usage.cacheWriteTokens ?? 0
       row.outputTokens += usage.outputTokens
       row.cost += attempt.cost
+      if (usage.partial === true) usagePartial = true
       if (usage.cacheReadTokens !== undefined || usage.cacheWriteTokens !== undefined) row.cacheReported = true
       row.chargeableAttempts += 1
       row.hasBillable = true
       if (attempt.priced) row.pricedAttempts += 1
-      else row.unpricedAttempts += 1
+      else {
+        row.unpricedAttempts += 1
+        if (attempt.currentOrder === true) row.unpricedCurrentAttempts += 1
+        else row.unpricedHistoricalAttempts += 1
+        if (attempt.provider !== null && attempt.model !== null) {
+          const routeKey = modelKey(attempt.provider, attempt.model)
+          let leftover = unpricedRoutes.get(routeKey)
+          if (leftover === undefined) {
+            leftover = {
+              provider: attempt.provider,
+              model: attempt.model,
+              name: attempt.name ?? `${attempt.provider} / ${attempt.model}`,
+              attempts: 0,
+              promptTokens: 0,
+              outputTokens: 0,
+              cacheReadTokens: 0,
+              firstTime: attempt.time,
+              lastTime: attempt.time,
+              currentOrder: attempt.currentOrder === true,
+            }
+            unpricedRoutes.set(routeKey, leftover)
+          }
+          leftover.attempts += 1
+          leftover.promptTokens += prompt
+          leftover.outputTokens += usage.outputTokens
+          leftover.cacheReadTokens += usage.cacheReadTokens ?? 0
+          leftover.firstTime = Math.min(leftover.firstTime, attempt.time)
+          leftover.lastTime = Math.max(leftover.lastTime, attempt.time)
+          leftover.currentOrder = leftover.currentOrder || attempt.currentOrder === true
+        }
+      }
 
       const key = attempt.provider !== null && attempt.model !== null
         ? modelKey(attempt.provider, attempt.model)
@@ -580,7 +739,8 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       else aggregate.unpricedAttempts += 1
     }
     row.cacheHit = row.cacheReported && row.promptTokens > 0 ? row.cacheReadTokens / row.promptTokens : null
-    row.partial = row.unpricedAttempts > 0
+    row.partial = row.unpricedAttempts > 0 || usagePartial
+    row.partialCurrent = row.unpricedCurrentAttempts > 0
     row.costKnown = row.attempts > 0 && row.unpricedAttempts === 0
     turnRows.push(row)
 
@@ -594,18 +754,22 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     totals.chargeableAttempts += row.chargeableAttempts
     totals.pricedAttempts += row.pricedAttempts
     totals.unpricedAttempts += row.unpricedAttempts
+    totals.unpricedCurrentAttempts += row.unpricedCurrentAttempts
+    totals.unpricedHistoricalAttempts += row.unpricedHistoricalAttempts
     totals.cacheReported = totals.cacheReported || row.cacheReported
     totals.hasBillable = totals.hasBillable || row.hasBillable
   }
 
   totals.cacheHit = totals.cacheReported && totals.promptTokens > 0 ? totals.cacheReadTokens / totals.promptTokens : null
-  totals.partial = totals.unpricedAttempts > 0
+  totals.partial = totals.unpricedAttempts > 0 || turnRows.some((row) => row.partial === true)
+  totals.partialCurrent = totals.unpricedCurrentAttempts > 0
   totals.costKnown = totals.attempts > 0 && totals.unpricedAttempts === 0
 
   return {
     turns: turnRows,
     totals,
     byModel: [...byModel.values()].sort((left, right) => left.cost - right.cost || left.name.localeCompare(right.name)),
+    unpricedRoutes: [...unpricedRoutes.values()].sort((left, right) => right.attempts - left.attempts || left.name.localeCompare(right.name)),
     lastTurn: turnRows.at(-1) ?? null,
   }
 }
@@ -622,12 +786,43 @@ function estimateAttemptCost(usage, prices) {
 /** Load and normalize the durable state. A corrupt file degrades to defaults. */
 async function loadState(ctx) {
   const path = statePath()
+  await removeStaleTemps(dirname(path), path)
   try {
     const text = await readFile(path, 'utf8')
-    return normalizeState(JSON.parse(text))
+    const raw = JSON.parse(text)
+    const state = normalizeState(raw)
+    if (isStateTooNew(raw)) {
+      // Hand back the readable subset but refuse every write, so an older plugin
+      // never clobbers a file it does not understand.
+      return { ...state, readOnly: true }
+    }
+    return state
   } catch (error) {
     if (error?.code !== 'ENOENT') ctx.logger?.warn?.(`[model-billing] ignoring unreadable state: ${messageOf(error)}`)
     return normalizeState(undefined)
+  }
+}
+
+/** True when the document was written by a newer plugin than this one. */
+function isStateTooNew(raw) {
+  return typeof raw?.version === 'number' && Number.isFinite(raw.version) && raw.version > STATE_VERSION
+}
+
+/**
+ * Delete temp files left behind by an older plugin version. The current writer
+ * uses a fixed `${path}.tmp` name that is always replaced, so anything else in
+ * the directory is debris from the old pid+timestamp naming scheme.
+ */
+async function removeStaleTemps(directory, path) {
+  let entries
+  try {
+    entries = await readdir(directory)
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith(`${basename(path)}.tmp-`)) continue
+    await unlink(join(directory, entry)).catch(() => {})
   }
 }
 
@@ -681,9 +876,15 @@ function normalizeState(raw) {
 async function writeState(state) {
   const path = statePath()
   await mkdir(dirname(path), { recursive: true })
-  const temporary = `${path}.tmp-${process.pid}-${Date.now()}`
+  const temporary = `${path}.tmp`
   await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, 'utf8')
-  await rename(temporary, path)
+  try {
+    await rename(temporary, path)
+  } catch (error) {
+    // A failed swap must not leave the fixed temp name behind to block the next write.
+    await unlink(temporary).catch(() => {})
+    throw error
+  }
 }
 
 /** Validate a route pair used as a map key. */
@@ -700,47 +901,127 @@ function validRoute(provider, model) {
 
 /** Merge one save request into the durable state and return the new envelope. */
 async function saveOrderAndPrices(ctx, body) {
-  const models = Array.isArray(body?.models) ? body.models : null
-  if (models === null || models.length > MAX_MODELS) {
+  const modelsSupplied = Array.isArray(body?.models)
+  const archiveSupplied = Array.isArray(body?.pricingArchive)
+  if (!modelsSupplied && !archiveSupplied) {
+    throw new BillingRefusal(400, 'bad-request', 'models or pricingArchive must be an array')
+  }
+  const models = modelsSupplied ? body.models : null
+  if (models !== null && models.length > MAX_MODELS) {
     throw new BillingRefusal(400, 'bad-request', `models must be an array of at most ${MAX_MODELS} entries`)
   }
-  const state = await loadState(ctx)
+  if (archiveSupplied && body.pricingArchive.length > MAX_STORED_PRICES) {
+    throw new BillingRefusal(400, 'bad-request', `pricingArchive must be at most ${MAX_STORED_PRICES} entries`)
+  }
   if (body?.display !== undefined && (body.display === null || typeof body.display !== 'object' || Array.isArray(body.display))) {
     throw new BillingRefusal(400, 'bad-request', 'display must be an object')
   }
-  const display = body?.display === undefined ? state.display : normalizeDisplay(body.display)
-  const order = []
-  const seen = new Set()
-  const pricing = { ...state.pricing }
-  for (const entry of models) {
+  // Validate the payload before queueing so a bad request never blocks good ones.
+  for (const entry of models ?? []) {
     if (!validRoute(entry?.provider, entry?.model)) {
       throw new BillingRefusal(400, 'bad-request', 'every model needs a non-empty provider and model id')
     }
-    const provider = entry.provider.trim()
-    const model = entry.model.trim()
-    const key = modelKey(provider, model)
-    if (seen.has(key)) throw new BillingRefusal(400, 'bad-request', `duplicate model: ${provider}/${model}`)
-    seen.add(key)
-    order.push({ provider, model })
-    if (!isDeepSeekRoute(provider, model)) pricing[key] = publicPricing(entry.pricing)
   }
-  const next = {
-    version: STATE_VERSION,
-    order,
-    pricing,
-    display,
-    savedAt: Date.now(),
+  for (const entry of body?.pricingArchive ?? []) {
+    if (!validRoute(entry?.provider, entry?.model)) {
+      throw new BillingRefusal(400, 'bad-request', 'every archived price needs a non-empty provider and model id')
+    }
   }
-  await enqueueWrite(ctx, next)
-  return stateEnvelope(next)
+  // Read, merge and write as one queued unit. Doing the read outside the queue
+  // lets two quick saves both start from the same stale snapshot, so the later
+  // one silently drops the earlier one's prices.
+  return enqueueWrite(async () => {
+    const state = await loadState(ctx)
+    if (state.readOnly === true) {
+      throw new BillingRefusal(409, 'state-too-new', 'this state file was written by a newer version of the plugin; upgrade before saving')
+    }
+    const display = body?.display === undefined ? state.display : normalizeDisplay(body.display)
+    const order = []
+    const seen = new Set()
+    const pricing = { ...state.pricing }
+    if (models === null) {
+      // An archive-only save must not disturb the configured order.
+      for (const entry of state.order) {
+        order.push({ provider: entry.provider, model: entry.model })
+        seen.add(modelKey(entry.provider, entry.model))
+      }
+    } else {
+      for (const entry of models) {
+        const provider = entry.provider.trim()
+        const model = entry.model.trim()
+        const key = modelKey(provider, model)
+        if (seen.has(key)) throw new BillingRefusal(400, 'bad-request', `duplicate model: ${provider}/${model}`)
+        seen.add(key)
+        order.push({ provider, model })
+        pricing[key] = publicPricing(entry.pricing)
+      }
+    }
+    if (archiveSupplied) {
+      for (const entry of body.pricingArchive) {
+        const provider = entry.provider.trim()
+        const model = entry.model.trim()
+        const key = modelKey(provider, model)
+        if (seen.has(key)) {
+          throw new BillingRefusal(400, 'bad-request', `archived price targets a configured model: ${provider}/${model}`)
+        }
+        const archived = publicPricing(entry.pricing)
+        // Three blank fields mean "remove this price-book entry".
+        if (PRICE_FIELDS.every((field) => archived[field] === null)) delete pricing[key]
+        else pricing[key] = archived
+      }
+    }
+    const capped = capPricing(pricing, order, ctx)
+    const next = {
+      version: STATE_VERSION,
+      order,
+      pricing: capped,
+      display,
+      savedAt: Date.now(),
+    }
+    await writeState(next)
+    // A save can accompany a newly discovered provider/model, so drop the
+    // catalog cache so the next catalog request reflects the fresh state.
+    invalidateCatalogCache()
+    return stateEnvelope(next)
+  })
+}
+/**
+ * Trim stored prices to the limit, keeping the routes the user still has in
+ * `order` first. Truncating by raw insertion order instead drops exactly the
+ * newest prices, which is the opposite of what a user expects.
+ */
+function capPricing(pricing, order, ctx) {
+  const keys = Object.keys(pricing)
+  if (keys.length <= MAX_STORED_PRICES) return pricing
+  const orderedKeys = new Set(order.map((entry) => modelKey(entry.provider, entry.model)))
+  const kept = []
+  for (const key of keys) {
+    if (orderedKeys.has(key)) kept.push(key)
+  }
+  for (const key of keys) {
+    if (kept.length >= MAX_STORED_PRICES) break
+    if (!orderedKeys.has(key)) kept.push(key)
+  }
+  const trimmed = {}
+  for (const key of kept.slice(0, MAX_STORED_PRICES)) trimmed[key] = pricing[key]
+  const dropped = keys.length - Object.keys(trimmed).length
+  if (dropped > 0) {
+    ctx.logger?.warn?.(`[model-billing] dropped ${dropped} price entries to stay under the ${MAX_STORED_PRICES} entry limit`)
+  }
+  return trimmed
 }
 
-/** Serialize writes so two quick saves cannot interleave. */
+/**
+ * Serialize state work so two quick saves cannot interleave. The whole
+ * read-merge-write runs inside the chain; the previous chain's failures are
+ * swallowed with `.then(operation, operation)` so one bad save never wedges the
+ * next one.
+ */
 let writeChain = Promise.resolve()
-function enqueueWrite(ctx, state) {
-  const operation = writeChain.then(() => writeState(state))
-  writeChain = operation.catch(() => {})
-  return operation
+function enqueueWrite(operation) {
+  const run = writeChain.then(operation, operation)
+  writeChain = run.catch(() => {})
+  return run
 }
 
 /**
@@ -770,7 +1051,40 @@ export function apply(ctx) {
 async function serveCatalog(ctx, request, response) {
   if (request.method !== 'GET') return sendJson(response, 405, { ok: false, code: 'method-not-allowed', message: 'only GET is accepted' })
   if (!sameOrigin(request)) return sendJson(response, 403, { ok: false, code: 'untrusted-origin', message: 'the request did not come from this Harness page' })
-  sendJson(response, 200, await buildCatalog(ctx))
+  sendJson(response, 200, await buildCatalog(ctx, { refresh: wantsRefresh(request) }))
+}
+
+/** `?refresh=1` forces the catalog to hit the adapters again instead of the cache. */
+function wantsRefresh(request) {
+  try {
+    return (new URL(request.url ?? '/', 'http://127.0.0.1').searchParams.get('refresh') ?? '') === '1'
+  } catch {
+    return false
+  }
+}
+
+const USAGE_CACHE_LIMIT = 50
+const usageCache = new Map()
+
+/** Cache one session's folded usage until its event tail or pricing changes. */
+function usageCacheKey(sessionId, lastSeq, savedAt) {
+  return `${sessionId}\u0000${lastSeq ?? 'none'}\u0000${savedAt ?? 'none'}`
+}
+
+function cachedUsage(sessionId, lastSeq, savedAt, fold) {
+  const key = usageCacheKey(sessionId, lastSeq, savedAt)
+  const hit = usageCache.get(key)
+  if (hit !== undefined) {
+    usageCache.delete(key)
+    usageCache.set(key, hit)
+    return hit
+  }
+  const value = fold()
+  usageCache.set(key, value)
+  while (usageCache.size > USAGE_CACHE_LIMIT) {
+    usageCache.delete(usageCache.keys().next().value)
+  }
+  return value
 }
 
 async function serveUsage(ctx, request, response) {
@@ -791,9 +1105,14 @@ async function serveUsage(ctx, request, response) {
     return sendJson(response, 404, { ok: false, code: 'session-not-found', message: 'this Session is not loaded in the Host' })
   }
   const state = await loadState(ctx)
-  const pricingByKey = new Map()
-  for (const [key, value] of Object.entries(state.pricing)) pricingByKey.set(key, publicPricing(value))
-  const usage = computeSessionUsage(session.ownEvents(), pricingByKey)
+  const events = session.ownEvents()
+  const lastSeq = Array.isArray(events) && events.length > 0 ? events[events.length - 1]?.seq : undefined
+  const usage = cachedUsage(sessionId, lastSeq, state.savedAt, () => {
+    const pricingByKey = new Map()
+    for (const [key, value] of Object.entries(state.pricing)) pricingByKey.set(key, publicPricing(value))
+    const orderKeys = new Set(state.order.map((entry) => modelKey(entry.provider, entry.model)))
+    return computeSessionUsage(events, pricingByKey, new Map(), orderKeys)
+  })
   sendJson(response, 200, {
     ok: true,
     sessionId,
@@ -828,7 +1147,11 @@ async function serveSelect(ctx, request, response) {
   try {
     body = JSON.parse(await readBody(request))
   } catch (error) {
-    return sendJson(response, 400, { ok: false, code: 'bad-request', message: messageOf(error) })
+    return sendJson(response, error instanceof BillingRefusal ? error.status : 400, {
+      ok: false,
+      code: error instanceof BillingRefusal ? error.code : 'bad-request',
+      message: messageOf(error),
+    })
   }
   const sessionId = typeof body?.sessionId === 'string' ? body.sessionId.trim() : ''
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(sessionId)) {
@@ -853,7 +1176,11 @@ async function serveSelect(ctx, request, response) {
     })
     sendJson(response, 200, { ok: true, selection })
   } catch (error) {
-    sendJson(response, 400, { ok: false, code: 'select-failed', message: messageOf(error) })
+    sendJson(response, error instanceof BillingRefusal ? error.status : 400, {
+      ok: false,
+      code: error instanceof BillingRefusal ? error.code : 'select-failed',
+      message: messageOf(error),
+    })
   }
 }
 
@@ -874,7 +1201,7 @@ function sendJson(response, status, value) {
 /** Whether the request came from this Harness page rather than another site. */
 function sameOrigin(request) {
   const host = request.headers.host
-  if (host !== undefined && !loopbackAuthority(host)) return false
+  if (host !== undefined && !trustedAuthority(request, host)) return false
   if (request.headers['sec-fetch-site'] === 'cross-site') return false
   const origin = request.headers.origin
   if (origin === undefined) return true
@@ -889,6 +1216,27 @@ function loopbackAuthority(host) {
   const lower = host.toLowerCase()
   const name = lower.startsWith('[') ? lower.slice(0, lower.indexOf(']') + 1) : lower.split(':')[0]
   return name === '127.0.0.1' || name === 'localhost' || name === '[::1]'
+}
+
+/**
+ * Loopback stays the default. A request whose Host header also matches the address
+ * this socket is actually listening on is trusted, so a reverse proxy or a LAN
+ * address works without letting a forged Host header through.
+ */
+function trustedAuthority(request, host) {
+  if (loopbackAuthority(host)) return true
+  const socket = request.socket
+  const address = socket?.localAddress
+  const port = socket?.localPort
+  if (typeof address !== 'string' || address.length === 0) return false
+  const local = authorityOf(address, port)
+  return local !== null && host.toLowerCase() === local
+}
+
+/** Format a socket address the way an HTTP Host header spells it. */
+function authorityOf(address, port) {
+  const name = address.includes(':') && !address.startsWith('[') ? `[${address}]` : address.toLowerCase()
+  return typeof port === 'number' && port > 0 ? `${name}:${port}` : name
 }
 
 /** Read a size-capped JSON request body. */
@@ -913,6 +1261,8 @@ function messageOf(error) {
 /** Pure helpers exported for the Host test run. */
 export const __test = {
   applySavedOrder,
+  authorityOf,
+  builtinRatesFor,
   buildCatalog,
   catalogPricing,
   computeSessionUsage,
@@ -922,6 +1272,8 @@ export const __test = {
   defaultPricing,
   estimateAttemptCost,
   isDeepSeekRoute,
+  isOfficialDeepSeekProvider,
+  isStateTooNew,
   loadState,
   modelKey,
   normalizeDisplay,
@@ -929,7 +1281,9 @@ export const __test = {
   normalizeUsage,
   priceSetComplete,
   publicPricing,
+  resolveRoutePricing,
   saveOrderAndPrices,
   statePath,
+  trustedAuthority,
   validRoute,
 }

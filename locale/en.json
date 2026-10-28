@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Models & Cost",
-    "description": "Reorder configured models, show built-in official DeepSeek peak/off-peak prices, edit per-million-token prices for other models, and estimate per-turn and session cost for non-DeepSeek models."
+    "description": "Reorder configured models, show built-in official DeepSeek peak/off-peak prices with optional custom overrides, edit three per-million-token prices, estimate per-turn and session cost, and keep historical prices for models you no longer use."
   }
 }

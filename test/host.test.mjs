@@ -8,6 +8,7 @@ import { __test } from '../host.js'
 
 const {
   applySavedOrder,
+  authorityOf,
   catalogPricing,
   computeSessionUsage,
   deepseekBuiltinPricing,
@@ -19,6 +20,7 @@ const {
   normalizeUsage,
   publicPricing,
   saveOrderAndPrices,
+  trustedAuthority,
   validRoute,
 } = __test
 
@@ -80,7 +82,7 @@ test('hardcodes the official DeepSeek peak and off-peak prices', () => {
   assert.deepEqual(pro.peak, { cacheHit: 0.3, cacheMiss: 9, output: 27 })
   assert.deepEqual(pro.offPeak, { cacheHit: 0.15, cacheMiss: 4.5, output: 13.5 })
   assert.equal(deepseekBuiltinPricing('qwen', 'qwen3.8-flash'), null)
-  assert.deepEqual(catalogPricing('qwen', 'qwen3.8-flash', qwenPricing), qwenPricing)
+  assert.deepEqual(catalogPricing('qwen', 'qwen3.8-flash', qwenPricing), { ...qwenPricing, source: 'user' })
 })
 
 test('prices DeepSeek by Beijing peak, lunch, weekend and holiday windows', () => {
@@ -151,14 +153,22 @@ test('bills cache hit, cache miss, output and DeepSeek built-in prices for a tur
   assert.equal(result.byModel.length, 3)
 })
 
-test('normalizes provider usage and rejects contradictory totals', () => {
+test('normalizes provider usage and flags contradictory totals as partial', () => {
   assert.deepEqual(normalizeUsage({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, cacheWriteTokens: 1, totalTokens: 18 }), {
     uncachedInputTokens: 10,
     outputTokens: 5,
     cacheReadTokens: 2,
     cacheWriteTokens: 1,
   })
-  assert.equal(normalizeUsage({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, cacheWriteTokens: 1, totalTokens: 99 }), undefined)
+  // A total that disagrees with the three buckets keeps those buckets and marks the
+  // row partial rather than dropping it, so the session is never under-reported.
+  assert.deepEqual(normalizeUsage({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, cacheWriteTokens: 1, totalTokens: 99 }), {
+    uncachedInputTokens: 10,
+    outputTokens: 5,
+    cacheReadTokens: 2,
+    cacheWriteTokens: 1,
+    partial: true,
+  })
   assert.equal(normalizeUsage({ inputTokens: 10, outputTokens: 5, reasoningTokens: 6 }), undefined)
 })
 
@@ -186,18 +196,23 @@ test('validates route pairs used as durable keys', () => {
 
 test('normalizes turn-tail display settings and drops unknown values', () => {
   assert.deepEqual(normalizeDisplay(undefined), {
+    showTurnTail: true,
+    showDock: true,
     showModels: true,
     showProvider: false,
     showCost: true,
     showTokens: false,
     showCacheHit: false,
     showLabels: true,
+    showUnpricedNotice: true,
     takeoverPicker: true,
     fontSize: 'normal',
     density: 'comfortable',
     fontWeight: 'normal',
   })
   assert.deepEqual(normalizeDisplay({
+    showTurnTail: false,
+    showDock: false,
     showModels: false,
     showProvider: true,
     showTokens: 'yes',
@@ -208,12 +223,15 @@ test('normalizes turn-tail display settings and drops unknown values', () => {
     fontWeight: 'bold',
     extra: 'ignored',
   }), {
+    showTurnTail: false,
+    showDock: false,
     showModels: false,
     showProvider: true,
     showCost: true,
     showTokens: false,
     showCacheHit: true,
     showLabels: true,
+    showUnpricedNotice: true,
     takeoverPicker: false,
     fontSize: 'normal',
     density: 'compact',
@@ -272,4 +290,155 @@ test('persists order and prices atomically, retaining prices for later routes', 
     else process.env.DSH_HOME = previous
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('keeps historical costs after a configured model is removed', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-model-billing-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = directory
+  const ctx = { logger: { warn() {} } }
+  try {
+    await saveOrderAndPrices(ctx, {
+      models: [
+        { provider: 'qwen', model: 'retired-model', pricing: qwenPricing },
+        { provider: 'qwen', model: 'current-model', pricing: {} },
+      ],
+    })
+    // Dropping the model from the configured order must not drop its price.
+    await saveOrderAndPrices(ctx, {
+      models: [{ provider: 'qwen', model: 'current-model', pricing: {} }],
+    })
+    const state = await loadState(ctx)
+    assert.deepEqual(state.order, [{ provider: 'qwen', model: 'current-model' }])
+    assert.equal(publicPricing(state.pricing[key('qwen', 'retired-model')]).cacheMiss, 2)
+
+    // A future plugin version normalizes the same file; the price must survive.
+    const roundTrip = normalizeState(JSON.parse(JSON.stringify(state)))
+    assert.equal(publicPricing(roundTrip.pricing[key('qwen', 'retired-model')]).output, 8)
+
+    const totals = computeSessionUsage(
+      [assistant(1, 1, 1, 'qwen', 'retired-model', { inputTokens: 1_000_000, outputTokens: 0 })],
+      new Map([[key('qwen', 'retired-model'), roundTrip.pricing[key('qwen', 'retired-model')]]]),
+      new Map(),
+      new Set([key('qwen', 'current-model')]),
+    ).totals
+    assert.equal(totals.cost, 2)
+    assert.equal(totals.unpricedAttempts, 0)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('edits historical prices without touching the configured model order', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-model-billing-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = directory
+  const ctx = { logger: { warn() {} } }
+  try {
+    await saveOrderAndPrices(ctx, {
+      models: [{ provider: 'qwen', model: 'current-model', pricing: qwenPricing }],
+    })
+    await saveOrderAndPrices(ctx, {
+      pricingArchive: [{ provider: 'qwen', model: 'retired-model', pricing: qwenPricing }],
+    })
+    const first = await loadState(ctx)
+    assert.deepEqual(first.order, [{ provider: 'qwen', model: 'current-model' }])
+    assert.equal(publicPricing(first.pricing[key('qwen', 'retired-model')]).output, 8)
+
+    await saveOrderAndPrices(ctx, {
+      pricingArchive: [{ provider: 'qwen', model: 'retired-model', pricing: {} }],
+    })
+    const second = await loadState(ctx)
+    assert.equal(second.pricing[key('qwen', 'retired-model')], undefined)
+    assert.equal(publicPricing(second.pricing[key('qwen', 'current-model')]).output, 8)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('keeps saved prices for a DeepSeek route that has no built-in rate', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-model-billing-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = directory
+  const ctx = { logger: { warn() {} } }
+  try {
+    const saved = { cacheHit: 0.5, cacheMiss: 2, output: 8 }
+    await saveOrderAndPrices(ctx, {
+      models: [{ provider: 'deepseek-account', model: 'deepseek-reasoner', pricing: saved }],
+    })
+    // The price must survive the round trip instead of being silently dropped.
+    const state = await loadState(ctx)
+    assert.deepEqual(publicPricing(state.pricing[key('deepseek-account', 'deepseek-reasoner')]), saved)
+
+    // And billing must use it, not the built-in Flash table.
+    const priced = new Map([[key('deepseek-account', 'deepseek-reasoner'), state.pricing[key('deepseek-account', 'deepseek-reasoner')]]])
+    const usage = { inputTokens: 1_000_000, outputTokens: 0 }
+    const totals = computeSessionUsage(
+      [assistant(1, 1, 1, 'deepseek-account', 'deepseek-reasoner', usage)],
+      priced,
+    ).totals
+    assert.equal(totals.cost, 2)
+    assert.equal(totals.unpricedAttempts, 0)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('lets a user price override the official DeepSeek built-in table', async () => {
+  const priced = new Map([[key('deepseek-account', 'deepseek-flash'), { cacheHit: 9, cacheMiss: 99, output: 999 }]])
+  const usage = { inputTokens: 1_000_000, outputTokens: 0 }
+  // 2026-10-26T02:00:00Z is Beijing 10:00 Monday — peak, where the built-in cacheMiss is 2.
+  const peak = Date.parse('2026-10-26T02:00:00Z')
+  const totals = computeSessionUsage(
+    [assistant(1, 1, 1, 'deepseek-account', 'deepseek-flash', usage, peak)],
+    priced,
+  ).totals
+  // The saved 99 wins over the built-in 2, so the override is what gets billed.
+  assert.equal(totals.cost, 99)
+  assert.equal(totals.unpricedAttempts, 0)
+  // The catalog still carries the official table so the UI can restore it.
+  const shown = catalogPricing('deepseek-account', 'deepseek-flash', { cacheHit: 9, cacheMiss: 99, output: 999 })
+  assert.equal(shown.source, 'user')
+  assert.equal(shown.official.peak.cacheMiss, 2)
+})
+
+test('trusts loopback and the address the socket actually listens on', () => {
+  const request = (host, localAddress, localPort) => ({ headers: { host }, socket: { localAddress, localPort } })
+  // Loopback keeps working without any socket information.
+  assert.equal(trustedAuthority({ headers: { host: '127.0.0.1:3233' } }, '127.0.0.1:3233'), true)
+  assert.equal(trustedAuthority({ headers: { host: 'localhost:3233' } }, 'localhost:3233'), true)
+  // A LAN address is trusted only when it matches the connection's local address.
+  assert.equal(trustedAuthority(request('192.168.1.9:3233', '192.168.1.9', 3233), '192.168.1.9:3233'), true)
+  assert.equal(trustedAuthority(request('192.168.1.9:3233', '192.168.1.10', 3233), '192.168.1.9:3233'), false)
+  // A forged Host header on a loopback connection is still rejected.
+  assert.equal(trustedAuthority(request('evil.example:3233', '127.0.0.1', 3233), 'evil.example:3233'), false)
+  // IPv6 authorities are bracketed the way HTTP spells them.
+  assert.equal(authorityOf('::1', 3233), '[::1]:3233')
+  assert.equal(authorityOf('192.168.1.9', 3233), '192.168.1.9:3233')
+  assert.equal(trustedAuthority(request('[::1]:3233', '::1', 3233), '[::1]:3233'), true)
+})
+
+test('separates configured and historical unpriced routes', () => {
+  const events = [
+    assistant(1, 1, 1, 'qwen', 'retired-model', { inputTokens: 1_000_000, outputTokens: 0 }),
+  ]
+  const usage = computeSessionUsage(events, new Map(), new Map(), new Set([key('qwen', 'current-model')]))
+  assert.equal(usage.totals.unpricedCurrentAttempts, 0)
+  assert.equal(usage.totals.unpricedHistoricalAttempts, 1)
+  assert.equal(usage.unpricedRoutes.length, 1)
+  assert.equal(usage.unpricedRoutes[0].provider, 'qwen')
+  assert.equal(usage.unpricedRoutes[0].model, 'retired-model')
+  assert.equal(usage.unpricedRoutes[0].attempts, 1)
+  assert.equal(usage.unpricedRoutes[0].currentOrder, false)
+
+  const current = computeSessionUsage(events, new Map(), new Map(), new Set([key('qwen', 'retired-model')]))
+  assert.equal(current.totals.unpricedCurrentAttempts, 1)
+  assert.equal(current.totals.unpricedHistoricalAttempts, 0)
+  assert.equal(current.unpricedRoutes[0].currentOrder, true)
 })

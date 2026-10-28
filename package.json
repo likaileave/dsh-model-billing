@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-billing",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "description": "Reorder models in the DSH composer picker, store three per-million-token prices, and estimate per-turn and session cost with built-in DeepSeek peak/off-peak rates.",
   "keywords": [
@@ -23,7 +23,7 @@
     "url": "https://github.com/likaileave/dsh-model-billing/issues"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": "^0.2.0-rc.2"
+    "@deepseek-ai/dsh": "^0.2.1-rc.3"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh": {
