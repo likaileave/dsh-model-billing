@@ -19,7 +19,6 @@
 - Catalog and usage reads are cached; catalog caching can be bypassed with `?refresh=1`.
 - The composer summary and detail panel are labelled “Composer cost estimate” (输入框下方费用估算), avoiding the “费用明细” name used by another plugin.
 - Cost figures no longer carry a trailing asterisk; partial state is shown by the notice instead.
-- Historical price rows use a two-row layout so provider, model, and all three prices stay readable; the remove button reads “删除”.
 - Requires DSH `^0.2.1-rc.3`.
 
 ### Fixed
