@@ -141,7 +141,7 @@ node --check client.js
 node --test test/*.test.mjs
 ```
 
-当前 25 个测试通过。插件没有运行时 npm 依赖。
+插件没有运行时 npm 依赖。
 
 ### License
 
@@ -240,7 +240,7 @@ node --check client.js
 node --test test/*.test.mjs
 ```
 
-25 tests currently pass. The plugin has no runtime npm dependencies.
+The plugin has no runtime npm dependencies.
 
 ### License
 
