@@ -25,6 +25,13 @@ const MAX_STORED_PRICES = 2000
 const MAX_BODY_BYTES = 256 * 1024
 const PRICE_FIELDS = ['cacheHit', 'cacheMiss', 'output']
 const KEY_SEPARATOR = '\u0000'
+// DeepSeek Search/Fetch: ¥5 per 1,000 successful requests, billed from
+// 2026-11-01 00:00 Beijing time. The web tools record one tool/call and one
+// tool/result per invocation, so the fee can be folded from the session log.
+const DEEPSEEK_WEB_TOOL_START = Date.parse('2026-11-01T00:00:00+08:00')
+const DEEPSEEK_WEB_TOOL_PRICE = 0.005
+const DEEPSEEK_SEARCH_PROVIDERS = new Set(['deepseek-official', 'deepseek-search-api'])
+const DEEPSEEK_FETCH_PROVIDERS = new Set(['deepseek-fetch-api'])
 const DISPLAY_DEFAULTS = Object.freeze({
   showTurnTail: true,
   showDock: true,
@@ -483,13 +490,39 @@ function userTextPreview(message) {
  * sample without a lifecycle route is retained with an unknown route so the UI
  * can report it as unpriced instead of silently dropping tokens.
  */
-function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new Map(), orderKeys = null) {
+/**
+ * Which web providers the current composition uses. Only DeepSeek's own
+ * providers are billed per successful request; DuckDuckGo, Tavily and local
+ * HTTP fetch are free, so they must never be charged here.
+ */
+function webToolBilling(ctx) {
+  const read = (value) => typeof value?.get === 'function' ? value.get() : value
+  let web
+  try {
+    web = ctx?.get?.('web')
+  } catch {
+    web = undefined
+  }
+  const search = read(web?.config?.searchProvider) ?? process.env.DSH_WEB_SEARCH_PROVIDER
+  const fetch = read(web?.config?.fetchProvider) ?? process.env.DSH_WEB_FETCH_PROVIDER
+  return {
+    search: typeof search === 'string' && DEEPSEEK_SEARCH_PROVIDERS.has(search) ? DEEPSEEK_WEB_TOOL_PRICE : null,
+    fetch: typeof fetch === 'string' && DEEPSEEK_FETCH_PROVIDERS.has(fetch) ? DEEPSEEK_WEB_TOOL_PRICE : null,
+    start: DEEPSEEK_WEB_TOOL_START,
+  }
+}
+
+/** Tools whose DeepSeek execution is charged per successful invocation. */
+const BILLABLE_WEB_TOOLS = new Set(['web_search', 'web_fetch'])
+
+function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new Map(), orderKeys = null, toolBilling = null) {
   const turns = new Map()
   // When the caller knows which routes are still configured, an unpriced call can
   // be split into "needs attention now" and "historical leftovers". Without that
   // set every unpriced call is historical, which keeps older callers unchanged.
   const orderSet = orderKeys instanceof Set ? orderKeys : null
   const unpricedRoutes = new Map()
+  const pendingToolCalls = new Map()
   let headerRoute
   let headerAt
   let latestTime = 0
@@ -507,6 +540,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
         seenUser: false,
         attempts: [],
         models: new Map(),
+        toolCharges: [],
       }
       turns.set(turn, entry)
     }
@@ -605,6 +639,39 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     }
     if (event?.type === 'assistant/attempt') {
       addAttempt(event, headerRoute, normalizeUsage(undefined, event.data?.stream))
+      continue
+    }
+    if (event?.type === 'tool/call') {
+      const callId = event.data?.callId
+      const name = event.data?.name
+      if (typeof callId === 'string' && BILLABLE_WEB_TOOLS.has(name)) {
+        pendingToolCalls.set(callId, { turn: event.data?.turn, name, time: Number(event.time) || latestTime })
+      }
+      continue
+    }
+    if (event?.type === 'tool/result') {
+      const callId = event.data?.message?.toolCallId ?? event.data?.callId
+      const call = typeof callId === 'string' ? pendingToolCalls.get(callId) : undefined
+      if (call === undefined) continue
+      pendingToolCalls.delete(callId)
+      const turn = Number.isSafeInteger(event.data?.turn) ? event.data.turn : call.turn
+      if (!Number.isSafeInteger(turn)) continue
+      const time = Number(event.time) || call.time
+      const entry = ensureTurn(turn, time)
+      entry.endTime = Math.max(entry.endTime, time)
+      const kind = call.name === 'web_fetch' ? 'fetch' : 'search'
+      const price = toolBilling?.[kind]
+      if (price === null || price === undefined) continue
+      const failed = event.data?.error !== undefined || event.data?.message?.isError === true
+      let succeeded = false
+      if (!failed && call.name === 'web_search') {
+        succeeded = Array.isArray(event.data?.meta?.sources) && event.data.meta.sources.length > 0
+      } else if (!failed && call.name === 'web_fetch') {
+        succeeded = event.data?.meta?.statusCode === 200
+      }
+      const billed = succeeded && time >= toolBilling.start
+      entry.toolCharges.push({ name: call.name, time, billed, cost: billed ? price : 0 })
+      continue
     }
   }
 
@@ -612,6 +679,11 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
   const byModel = new Map()
   const totals = {
     cost: 0,
+    toolCost: 0,
+    webSearchCalls: 0,
+    webSearchBilled: 0,
+    webFetchCalls: 0,
+    webFetchBilled: 0,
     promptTokens: 0,
     uncachedInputTokens: 0,
     cacheReadTokens: 0,
@@ -632,13 +704,18 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
   }
 
   for (const entry of [...turns.values()].sort((left, right) => left.turn - right.turn)) {
-    if (entry.attempts.length === 0) continue
+    if (entry.attempts.length === 0 && entry.toolCharges.length === 0) continue
     const row = {
       turn: entry.turn,
       startTime: entry.startTime,
       endTime: entry.endTime,
       preview: entry.preview,
       cost: 0,
+      toolCost: 0,
+      webSearchCalls: 0,
+      webSearchBilled: 0,
+      webFetchCalls: 0,
+      webFetchBilled: 0,
       promptTokens: 0,
       uncachedInputTokens: 0,
       cacheReadTokens: 0,
@@ -738,6 +815,18 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       if (attempt.priced) aggregate.pricedAttempts += 1
       else aggregate.unpricedAttempts += 1
     }
+    for (const charge of entry.toolCharges) {
+      if (charge.name === 'web_search') {
+        row.webSearchCalls += 1
+        if (charge.billed) row.webSearchBilled += 1
+      } else if (charge.name === 'web_fetch') {
+        row.webFetchCalls += 1
+        if (charge.billed) row.webFetchBilled += 1
+      }
+      row.toolCost += charge.cost
+      row.hasBillable = true
+    }
+    row.cost += row.toolCost
     row.cacheHit = row.cacheReported && row.promptTokens > 0 ? row.cacheReadTokens / row.promptTokens : null
     row.partial = row.unpricedAttempts > 0 || usagePartial
     row.partialCurrent = row.unpricedCurrentAttempts > 0
@@ -745,6 +834,11 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     turnRows.push(row)
 
     totals.cost += row.cost
+    totals.toolCost += row.toolCost
+    totals.webSearchCalls += row.webSearchCalls
+    totals.webSearchBilled += row.webSearchBilled
+    totals.webFetchCalls += row.webFetchCalls
+    totals.webFetchBilled += row.webFetchBilled
     totals.promptTokens += row.promptTokens
     totals.uncachedInputTokens += row.uncachedInputTokens
     totals.cacheReadTokens += row.cacheReadTokens
@@ -1067,12 +1161,12 @@ const USAGE_CACHE_LIMIT = 50
 const usageCache = new Map()
 
 /** Cache one session's folded usage until its event tail or pricing changes. */
-function usageCacheKey(sessionId, lastSeq, savedAt) {
-  return `${sessionId}\u0000${lastSeq ?? 'none'}\u0000${savedAt ?? 'none'}`
+function usageCacheKey(sessionId, lastSeq, savedAt, webKey = '') {
+  return `${sessionId}\u0000${lastSeq ?? 'none'}\u0000${savedAt ?? 'none'}\u0000${webKey}`
 }
 
-function cachedUsage(sessionId, lastSeq, savedAt, fold) {
-  const key = usageCacheKey(sessionId, lastSeq, savedAt)
+function cachedUsage(sessionId, lastSeq, savedAt, fold, webKey = '') {
+  const key = usageCacheKey(sessionId, lastSeq, savedAt, webKey)
   const hit = usageCache.get(key)
   if (hit !== undefined) {
     usageCache.delete(key)
@@ -1107,12 +1201,14 @@ async function serveUsage(ctx, request, response) {
   const state = await loadState(ctx)
   const events = session.ownEvents()
   const lastSeq = Array.isArray(events) && events.length > 0 ? events[events.length - 1]?.seq : undefined
+  const billing = webToolBilling(ctx)
+  const webKey = `${billing.search ?? 'free'}:${billing.fetch ?? 'free'}:${billing.start}`
   const usage = cachedUsage(sessionId, lastSeq, state.savedAt, () => {
     const pricingByKey = new Map()
     for (const [key, value] of Object.entries(state.pricing)) pricingByKey.set(key, publicPricing(value))
     const orderKeys = new Set(state.order.map((entry) => modelKey(entry.provider, entry.model)))
-    return computeSessionUsage(events, pricingByKey, new Map(), orderKeys)
-  })
+    return computeSessionUsage(events, pricingByKey, new Map(), orderKeys, billing)
+  }, webKey)
   sendJson(response, 200, {
     ok: true,
     sessionId,
@@ -1286,4 +1382,5 @@ export const __test = {
   statePath,
   trustedAuthority,
   validRoute,
+  webToolBilling,
 }

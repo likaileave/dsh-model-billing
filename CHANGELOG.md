@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0] - 2026-11-02
+
+### 新增
+
+- 计入 DeepSeek Search/Fetch 按次费：当 DSH 使用 DeepSeek 自带的 `deepseek-official`、`deepseek-search-api` 或 `deepseek-fetch-api` 时，按 ¥5 / 1,000 次成功请求（2026-11-01 00:00 北京时间起）计费；DuckDuckGo、Tavily、普通 HTTP 抓取等免费 provider 不计费。
+
+### Added
+
+- DeepSeek Search/Fetch per-request fees are now included when DSH runs on DeepSeek's own `deepseek-official`, `deepseek-search-api`, or `deepseek-fetch-api` providers: ¥5 per 1,000 successful requests from 2026-11-01 00:00 Beijing time. Free providers such as DuckDuckGo, Tavily, and plain HTTP fetch are not charged.
+
 ## [0.2.0] - 2026-10-28
 
 ### 新增

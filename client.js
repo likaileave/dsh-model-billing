@@ -95,6 +95,7 @@ window.__ModuleLoader__.load({
         invalidRoute: '提供商和模型都不能为空。',
         remove: '删除',
         estimateNote: '金额由会话日志中的 token 用量和缓存命中估算；DeepSeek 按事件时间使用内置峰谷价，实际账单以提供方为准。',
+        webToolNote: '含 DeepSeek Search/Fetch 按次费 ≈ {amount}（搜索 {searchBilled}/{searchCalls} 次，抓取 {fetchBilled}/{fetchCalls} 次）。',
         listSep: '、',
         turnCost: '费用',
         turnTokens: '本轮 Token',
@@ -210,6 +211,7 @@ window.__ModuleLoader__.load({
         invalidRoute: 'Provider and model are both required.',
         remove: 'Remove',
         estimateNote: 'Amounts are estimated from token usage and cache hits in the session log; DeepSeek uses built-in peak/off-peak prices at the event time, and the provider bill is authoritative.',
+        webToolNote: 'Includes DeepSeek Search/Fetch per-request fees ≈ {amount} (search {searchBilled}/{searchCalls}, fetch {fetchBilled}/{fetchCalls}).',
         listSep: ', ',
         turnCost: 'Cost',
         turnTokens: 'Turn tokens',
@@ -1595,6 +1597,15 @@ window.__ModuleLoader__.load({
         modelTable,
         unpricedTable,
         h('p', { className: 'mb-panel-note' }, translate('estimateNote')),
+        totals.toolCost > 0
+          ? h('p', { className: 'mb-panel-note' }, translate('webToolNote', {
+            amount: formatMoney(totals.toolCost),
+            searchBilled: totals.webSearchBilled ?? 0,
+            searchCalls: totals.webSearchCalls ?? 0,
+            fetchBilled: totals.webFetchBilled ?? 0,
+            fetchCalls: totals.webFetchCalls ?? 0,
+          }))
+          : null,
         totals.partial && display.showUnpricedNotice
           ? h('p', { className: 'mb-warn' }, translate('partialNote'))
           : null)

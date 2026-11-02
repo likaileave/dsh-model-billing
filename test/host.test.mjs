@@ -22,6 +22,7 @@ const {
   saveOrderAndPrices,
   trustedAuthority,
   validRoute,
+  webToolBilling,
 } = __test
 
 const key = (provider, model) => `${provider}\u0000${model}`
@@ -441,4 +442,79 @@ test('separates configured and historical unpriced routes', () => {
   assert.equal(current.totals.unpricedCurrentAttempts, 1)
   assert.equal(current.totals.unpricedHistoricalAttempts, 0)
   assert.equal(current.unpricedRoutes[0].currentOrder, true)
+})
+
+test('charges DeepSeek web search once per successful tool call', () => {
+  const start = Date.parse('2026-11-01T00:00:00+08:00')
+  const call = (turn, callId, name, time) => ({
+    type: 'tool/call',
+    seq: 1,
+    time,
+    data: { turn, step: 1, callId, name, arguments: '{"queries":["x"]}' },
+  })
+  const result = (turn, callId, time, meta, isError = false) => ({
+    type: 'tool/result',
+    seq: 2,
+    time,
+    data: {
+      turn,
+      step: 1,
+      message: { toolCallId: callId, content: [{ type: 'text', text: 'ok' }], isError },
+      meta,
+    },
+  })
+  const billing = { search: 0.005, fetch: 0.005, start }
+
+  const priced = computeSessionUsage([
+    call(1, 'c1', 'web_search', start + 1_000),
+    result(1, 'c1', start + 2_000, { sources: [{ url: 'https://example.com' }] }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(priced.totals.webSearchCalls, 1)
+  assert.equal(priced.totals.webSearchBilled, 1)
+  assert.equal(priced.totals.toolCost, 0.005)
+  assert.equal(priced.totals.cost, 0.005)
+
+  // Empty search results are not billed, and a call before the start time is free.
+  const empty = computeSessionUsage([
+    call(1, 'c2', 'web_search', start + 1_000),
+    result(1, 'c2', start + 2_000, { sources: [] }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(empty.totals.webSearchCalls, 1)
+  assert.equal(empty.totals.webSearchBilled, 0)
+  assert.equal(empty.totals.toolCost, 0)
+
+  const early = computeSessionUsage([
+    call(1, 'c3', 'web_search', start - 1_000),
+    result(1, 'c3', start - 500, { sources: [{ url: 'https://example.com' }] }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(early.totals.webSearchBilled, 0)
+
+  // A non-DeepSeek provider must never be charged by this rule.
+  const free = computeSessionUsage([
+    call(1, 'c4', 'web_search', start + 1_000),
+    result(1, 'c4', start + 2_000, { sources: [{ url: 'https://example.com' }] }),
+  ], new Map(), new Map(), null, { search: null, fetch: null, start })
+  assert.equal(free.totals.webSearchCalls, 0)
+  assert.equal(free.totals.toolCost, 0)
+
+  // Fetch is charged only on a successful 200 response.
+  const fetched = computeSessionUsage([
+    call(1, 'c5', 'web_fetch', start + 1_000),
+    result(1, 'c5', start + 2_000, { statusCode: 200 }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(fetched.totals.webFetchBilled, 1)
+  assert.equal(fetched.totals.toolCost, 0.005)
+})
+
+test('detects only DeepSeek web providers as billable', () => {
+  const ctx = (search, fetch) => ({
+    get: (name) => name === 'web'
+      ? { config: { searchProvider: { get: () => search }, fetchProvider: { get: () => fetch } } }
+      : undefined,
+  })
+  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, 0.005)
+  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).fetch, null)
+  assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).fetch, 0.005)
+  assert.equal(webToolBilling(ctx('ddg', 'fs-quality-fetch')).search, null)
+  assert.equal(webToolBilling({}).search, null)
 })
