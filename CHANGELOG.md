@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.2] - 2026-11-05
+
+### 变更
+
+- 费用统计改为读取 Session 投影，不再调用已弃用的同步会话事件读取接口（DSH 0.2.2 起标记弃用，后续大版本可能移除）；费用数字与直接折叠会话日志的结果一致。
+- 切换模型或推理强度被拒绝时，改为菜单内浮层提示并自动消失，菜单不再因错误信息被撑高；模型目录本身加载失败时仍保留内联错误与「重新加载」按钮。
+
+### Changed
+
+- Cost estimation now reads a Session projection instead of the deprecated synchronous session-event readers (deprecated since DSH 0.2.2 and removable in a later major version); the reported cost matches folding the session log directly.
+- A rejected model or reasoning-effort switch now shows a self-dismissing overlay inside the picker instead of an inline error that grew the menu; a failed model-catalog load still shows the inline error with its retry button.
+
 ## [0.3.1] - 2026-11-05
 
 ### 变更

@@ -1139,6 +1139,9 @@ export function apply(ctx) {
   const onSelect = (request, response) => {
     void serveSelect(ctx, request, response).catch((error) => fail(ctx, response, error))
   }
+  // Register the samples projection before the routes: the unit folds lazily for
+  // sessions that already existed, and drives every later event eagerly.
+  void billingProjectionHandle(ctx)
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: CATALOG_PATH, handler: onCatalog }), 'model-billing: catalog route')
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: USAGE_PATH, handler: onUsage }), 'model-billing: usage route')
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: SAVE_PATH, handler: onSave }), 'model-billing: save route')
@@ -1159,6 +1162,156 @@ function wantsRefresh(request) {
   } catch {
     return false
   }
+}
+
+// ---------------------------------------------------------------------------
+// Billing samples
+//
+// `session.ownEvents()` / `snapshotEvents()` are synchronous log reads that
+// 0.2.2 deprecates for production use, so the fold is fed by a session
+// projection instead: the registry drives it per committed event, folds the log
+// lazily for sessions that predate the registration, and checkpoints it with
+// every other unit. The state keeps a trimmed copy of each billing-relevant
+// event rather than the durable log, because the fold only reads a few fields.
+// ---------------------------------------------------------------------------
+
+const BILLING_SAMPLES_KEY = 'model-billing/samples'
+const BILLING_SAMPLES_VERSION = 1
+
+/** The last usage chunk of a durable assistant stream, kept alone. */
+function usageStreamRecord(stream) {
+  if (!Array.isArray(stream)) return undefined
+  for (let index = stream.length - 1; index >= 0; index -= 1) {
+    const record = stream[index]
+    if (record?.type === 'chunk' && record.chunk?.type === 'usage') {
+      return { type: 'chunk', time: record.time, chunk: { type: 'usage', usage: record.chunk.usage } }
+    }
+  }
+  return undefined
+}
+
+/** One committed event trimmed to the fields `computeSessionUsage` reads. */
+function billingSample(event) {
+  const seq = event?.seq
+  const time = event?.time
+  switch (event?.type) {
+    case 'turn/start':
+    case 'turn/end':
+      return { type: event.type, seq, time, data: { turn: event.data?.turn } }
+    case 'user/message': {
+      const content = Array.isArray(event.data?.content)
+        ? event.data.content.filter((block) => block?.type === 'text').map((block) => ({ type: 'text', text: block.text }))
+        : []
+      return { type: 'user/message', seq, time, data: { content } }
+    }
+    case 'request/header': {
+      const config = event.data?.header?.config
+      return { type: 'request/header', seq, time, data: { header: { config: { provider: config?.provider, model: config?.model } } } }
+    }
+    case 'assistant/message': {
+      const source = event.data?.message?.source
+      const usage = event.data?.usage
+      const record = usageStreamRecord(event.data?.stream)
+      return {
+        type: 'assistant/message',
+        seq,
+        time,
+        data: {
+          turn: event.data?.turn,
+          message: { source: { provider: source?.provider, model: source?.model } },
+          ...usage === undefined || usage === null ? {} : { usage },
+          ...record === undefined ? {} : { stream: [record] },
+        },
+      }
+    }
+    case 'assistant/attempt': {
+      const record = usageStreamRecord(event.data?.stream)
+      return {
+        type: 'assistant/attempt',
+        seq,
+        time,
+        // `turn` is what the fold keys the attempt on; without it the sample is dropped.
+        data: { turn: event.data?.turn, step: event.data?.step, ...record === undefined ? {} : { stream: [record] } },
+      }
+    }
+    case 'tool/call':
+      return { type: 'tool/call', seq, time, data: { turn: event.data?.turn, callId: event.data?.callId, name: event.data?.name } }
+    case 'tool/result': {
+      const message = event.data?.message
+      const error = event.data?.error
+      const meta = event.data?.meta
+      return {
+        type: 'tool/result',
+        seq,
+        time,
+        data: {
+          turn: event.data?.turn,
+          ...message === undefined ? {} : { message: { toolCallId: message?.toolCallId, isError: message?.isError } },
+          ...error === undefined ? {} : { error },
+          ...meta === undefined ? {} : { meta },
+        },
+      }
+    }
+    default:
+      return undefined
+  }
+}
+
+/** Shape check for checkpoint restores; the plugin ships no zod, so it is hand-rolled. */
+const billingSamplesSchema = {
+  parse(value) {
+    if (value === null || typeof value !== 'object' || !Array.isArray(value.samples)) {
+      throw new TypeError('model-billing: unexpected samples projection state')
+    }
+    return value
+  },
+}
+
+const billingSamplesProjection = {
+  key: BILLING_SAMPLES_KEY,
+  stateVersion: BILLING_SAMPLES_VERSION,
+  stateSchema: billingSamplesSchema,
+  init(header, inheritedEventCount) {
+    return { inheritedCut: Number(inheritedEventCount) || 0, samples: [] }
+  },
+  apply(state, event) {
+    // A fork child owns only the events after its inherited prefix; the prefix
+    // was already billed in the session it came from.
+    if (typeof event?.seq === 'number' && event.seq < state.inheritedCut) return state
+    const sample = billingSample(event)
+    if (sample === undefined) return state
+    return { inheritedCut: state.inheritedCut, samples: [...state.samples, sample] }
+  },
+}
+
+const billingProjectionPromises = new WeakMap()
+
+/**
+ * The billing projection handle for one Host context, or null on a Harness that
+ * predates `sessionProjections`. Registration is memoized per context.
+ */
+function billingProjectionHandle(ctx) {
+  const cached = billingProjectionPromises.get(ctx)
+  if (cached !== undefined) return cached
+  let service
+  try {
+    service = ctx?.get?.('sessionProjections')
+  } catch {
+    service = undefined
+  }
+  const promise = service?.register === undefined
+    ? Promise.resolve(null)
+    : Promise.resolve(service.register(billingSamplesProjection)).catch(() => null)
+  billingProjectionPromises.set(ctx, promise)
+  return promise
+}
+
+/** The billing samples of one session, from the projection or the log on old hosts. */
+async function sessionBillingSamples(ctx, session) {
+  const handle = await billingProjectionHandle(ctx)
+  if (handle !== null && handle !== undefined) return handle.stateOf(session).samples
+  if (typeof session.snapshotEvents === 'function') return session.snapshotEvents(session.inheritedEventCount)
+  return session.ownEvents()
 }
 
 const USAGE_CACHE_LIMIT = 50
@@ -1203,7 +1356,7 @@ async function serveUsage(ctx, request, response) {
     return sendJson(response, 404, { ok: false, code: 'session-not-found', message: 'this Session is not loaded in the Host' })
   }
   const state = await loadState(ctx)
-  const events = session.ownEvents()
+  const events = await sessionBillingSamples(ctx, session)
   const lastSeq = Array.isArray(events) && events.length > 0 ? events[events.length - 1]?.seq : undefined
   const billing = webToolBilling(ctx)
   const webKey = `${billing.search ?? 'free'}:${billing.fetch ?? 'free'}:${billing.start}`
@@ -1362,6 +1515,8 @@ function messageOf(error) {
 export const __test = {
   applySavedOrder,
   authorityOf,
+  billingSample,
+  billingSamplesProjection,
   builtinRatesFor,
   buildCatalog,
   catalogPricing,

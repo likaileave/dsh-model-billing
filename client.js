@@ -751,7 +751,12 @@ window.__ModuleLoader__.load({
       .mb-picker-search::placeholder { color: var(--dsw-alias-label-caption, var(--dsw-alias-label-secondary)); }
       .mb-picker-search:focus { border-color: var(--dsw-alias-state-business-primary); outline: none; }
       .mb-picker-list { min-height: 0; overflow-y: auto; padding: 0 2px; display: flex; flex-direction: column; }
-      .mb-picker-group { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); background: var(--dsw-alias-menu-group-header-fill, var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-1))); position: sticky; top: 0; z-index: 1; margin-top: 2px; padding: 10px 10px 6px; font-size: 11px; font-weight: 500; line-height: 16px; }
+      .mb-picker-group { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); background: var(--dsw-alias-menu-group-header-fill, var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-1))); position: sticky; top: 0; z-index: 1; margin-top: 2px; padding: 5px 10px; font-size: 11px; font-weight: 500; line-height: 16px; }
+      /* The first group header opens the list, so the menu's own padding already
+         separates it from the top edge; it only drops the inter-group lead-in.
+         A negative margin cannot do this: the list is a scroll container, and the
+         overflow clip eats any lead-in that leaves its scrollport. */
+      .mb-picker-group:first-child { margin-top: 0; }
       .mb-picker-row { box-sizing: border-box; border-radius: var(--dsw-radius-md); width: auto; min-width: 100%; color: inherit; text-align: left; cursor: pointer; background: 0 0; border: none; outline: none; align-items: center; gap: 8px; padding: 10px; font: inherit; display: flex; }
       .mb-picker-row + .mb-picker-row { margin-top: 2px; }
       .mb-picker-row:hover:not(:disabled), .mb-picker-row:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }
@@ -773,6 +778,9 @@ window.__ModuleLoader__.load({
       .mb-picker-error { border-radius: var(--dsw-radius-md); background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); margin-bottom: 3px; padding: 6px 7px; font-size: 11px; line-height: 16px; }
       .mb-picker-retry { align-self: flex-start; margin: 0 4px 2px; }
       .mb-picker-status { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); padding: 4px 7px; font-size: 11px; line-height: 16px; }
+      .mb-picker-dot { width: 12px; height: 12px; border: 2px solid var(--dsw-alias-state-business-primary); border-right-color: transparent; border-radius: 50%; flex: none; animation: mb-picker-spin .7s linear infinite; }
+      @keyframes mb-picker-spin { to { transform: rotate(360deg); } }
+      .mb-picker-toast { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 3; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-state-error-primary); color: #fff; padding: 7px 9px; font-size: 12px; line-height: 16px; box-shadow: var(--dsw-elevation-prominent); }
       .mb-fatal { border: 1px solid var(--dsw-alias-state-error-primary); color: var(--dsw-alias-state-error-primary); border-radius: 8px; padding: 12px; }
       @media (max-width: 720px) {
         .mb-price-grid { grid-template-columns: 1fr; }
@@ -1758,7 +1766,10 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = useState(false)
       const [query, setQuery] = useState('')
       const [selecting, setSelecting] = useState(false)
-      const [failure, setFailure] = useState(null)
+      // The route being submitted, so its row can show a pending spinner, and a
+      // transient rejection message that must not push the list around.
+      const [pending, setPending] = useState(null)
+      const [toast, setToast] = useState(null)
       const [menuPos, setMenuPos] = useState(null)
       // Roving cursor for arrow-key navigation inside the model list.
       const [activeIndex, setActiveIndex] = useState(0)
@@ -1815,6 +1826,13 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (locked && open) setOpen(false)
       }, [locked, open])
+
+      // A rejection toast clears itself; the menu is not blocked while it shows.
+      useEffect(() => {
+        if (toast === null) return undefined
+        const timer = setTimeout(() => setToast(null), 4200)
+        return () => clearTimeout(timer)
+      }, [toast])
 
       const rank = useMemo(() => {
         const map = new Map()
@@ -1952,14 +1970,15 @@ window.__ModuleLoader__.load({
       const close = (restoreFocus) => {
         setOpen(false)
         setQuery('')
-        setFailure(null)
+        setToast(null)
         if (restoreFocus) queueMicrotask(() => triggerRef.current?.focus())
       }
 
       const submit = async (selection) => {
         if (busy) return
         setSelecting(true)
-        setFailure(null)
+        setToast(null)
+        setPending(selection)
         try {
           const result = directory !== null
             ? await directory.select(selection)
@@ -1969,14 +1988,16 @@ window.__ModuleLoader__.load({
               body: JSON.stringify({ sessionId, ...selection }),
             })
           if (result?.ok === false) {
-            setFailure(result.error?.message ?? translate('pickerEmpty'))
+            // A refusal is a toast: the list stays where the user left it.
+            setToast(result.error?.message ?? translate('pickerEmpty'))
             return
           }
           close(true)
         } catch (error) {
-          setFailure(error instanceof Error ? error.message : String(error))
+          setToast(error instanceof Error ? error.message : String(error))
         } finally {
           setSelecting(false)
+          setPending(null)
         }
       }
 
@@ -2006,7 +2027,7 @@ window.__ModuleLoader__.load({
           close(true)
           return
         }
-        setFailure(null)
+        setToast(null)
         // Open the cursor on the row the user is already using, when there is one.
         const selectedAt = filtered.findIndex((entry) => entry.group.id === current?.provider && entry.model.id === current?.model)
         setActiveIndex(selectedAt < 0 ? 0 : selectedAt)
@@ -2022,7 +2043,6 @@ window.__ModuleLoader__.load({
           maxHeight: menuPos.maxHeight,
           ...menuPos.top === undefined ? { bottom: menuPos.bottom } : { top: menuPos.top },
         }
-      const errorText = failure ?? (state?.status === 'error' ? state.error : null)
 
       // Arrow keys move a roving cursor through the list. Enter and Space are
       // left to the focused row itself, so a <button> keeps its native
@@ -2123,18 +2143,20 @@ window.__ModuleLoader__.load({
                     h('span', { className: 'mb-picker-model' }, entry.model.name),
                     h(PriceLines, { pricing: price, translate })),
                   h('span', { className: 'mb-picker-check' },
-                    selected
-                      ? h('svg', {
-                        viewBox: '0 0 16 16',
-                        width: 14,
-                        height: 14,
-                        fill: 'none',
-                        stroke: 'currentColor',
-                        strokeWidth: 1.7,
-                        'aria-hidden': true,
-                      },
-                        h('path', { d: 'M3.5 8.5l3 3 6-7' }))
-                      : null)))
+                    pending !== null && pending.provider === entry.group.id && pending.model === entry.model.id
+                      ? h('span', { className: 'mb-picker-dot', 'aria-hidden': true })
+                      : selected
+                        ? h('svg', {
+                          viewBox: '0 0 16 16',
+                          width: 14,
+                          height: 14,
+                          fill: 'none',
+                          stroke: 'currentColor',
+                          strokeWidth: 1.7,
+                          'aria-hidden': true,
+                        },
+                          h('path', { d: 'M3.5 8.5l3 3 6-7' }))
+                        : null)))
             })),
         effortChoices.length === 0 ? null : h(Fragment, null,
           h('div', { className: 'mb-picker-divider' }),
@@ -2149,13 +2171,15 @@ window.__ModuleLoader__.load({
               onClick: () => chooseEffort(choice.effort),
             }, choice.label)))),
         busy ? h('div', { className: 'mb-picker-status' }, translate('switching')) : null,
-        errorText === null ? null : h('div', { className: 'mb-picker-error' }, errorText),
+        toast === null ? null : h('div', { className: 'mb-picker-toast', role: 'status', 'aria-live': 'polite' }, toast),
+        state?.status === 'error'
+          ? h('div', { className: 'mb-picker-error' }, state.error)
+          : null,
         state?.status === 'error'
           ? h('button', {
             type: 'button',
             className: 'mb-btn mb-picker-retry',
             onClick: () => {
-              setFailure(null)
               directory.load().catch(() => {})
             },
           }, translate('pickerRetry'))
