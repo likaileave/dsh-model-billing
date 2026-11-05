@@ -512,8 +512,10 @@ test('detects only DeepSeek web providers as billable', () => {
       ? { config: { searchProvider: { get: () => search }, fetchProvider: { get: () => fetch } } }
       : undefined,
   })
-  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, 0.005)
+  // Messages search runs inside a model turn, so it is token-billed, not per request.
+  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, null)
   assert.equal(webToolBilling(ctx('deepseek-official', 'http')).fetch, null)
+  assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).search, 0.005)
   assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).fetch, 0.005)
   assert.equal(webToolBilling(ctx('ddg', 'fs-quality-fetch')).search, null)
   assert.equal(webToolBilling({}).search, null)

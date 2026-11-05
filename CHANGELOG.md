@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### 变更
+
+- 只对 DeepSeek 独立的 Search / Fetch API（`deepseek-search-api` / `deepseek-fetch-api`）计入按次费；Messages 搜索（`deepseek-official`）的检索在模型回合内完成，费用已随该次请求的 token 计入，不再重复按次收费。
+
+### Changed
+
+- Per-request Search/Fetch fees now apply only to DeepSeek's standalone Search / Fetch APIs (`deepseek-search-api` / `deepseek-fetch-api`). Messages search (`deepseek-official`) runs inside a model turn, so its cost already arrives as that turn's tokens and is no longer charged per request.
+
 ## [0.3.0] - 2026-11-02
 
 ### 新增

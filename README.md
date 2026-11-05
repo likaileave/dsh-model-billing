@@ -34,7 +34,7 @@
 - **逐轮费用与使用模型**：每轮结束后在轮尾显示这一轮使用的模型，以及该轮费用和缓存命中率。
 - **可配置轮尾**：在设置中总开关轮尾显示，并可分别开关使用模型、模型提供商、费用、token、缓存命中率、文字标签，调整字号、间距和字重；也可以关闭选择器接管，恢复 DSH 内置模型选择器。输入框下方的费用估算另有独立开关。
 - **本会话费用**：输入框下方显示本会话累计估算、最近一轮费用和缓存命中率；展开后可查看按轮次和按模型的明细。
-- **DeepSeek Search/Fetch 按次费**：当 DSH 的 Web 搜索或抓取使用 DeepSeek 自带 provider 时，按官方 ¥5 / 1,000 次成功请求计入合计，并在费用明细里单独列出搜索、抓取的计费次数。
+- **DeepSeek Search/Fetch 按次费**：当 DSH 的 Web 搜索或抓取使用 DeepSeek 独立的 Search / Fetch API 时，按官方 ¥5 / 1,000 次成功请求计入合计，并在费用明细里单独列出搜索、抓取的计费次数。
 - **历史价格与未定价路由**：设置页的“历史价格”区可以为已移出配置的模型补价、改价或删除，不必把模型加回列表；从模型列表删除模型不会删除它的价格，历史调用仍按保存的价格计算，查不到名称时显示原始模型 id。缺价时显示统一提示，可在设置里关闭这条提示。
 - **DeepSeek 也计入金额**：每条 usage 按事件发生时的北京时间自动选择高峰或空闲价，与第三方模型一起进入统计。
 
@@ -133,7 +133,7 @@ npm 包和 GitHub Release 使用相同版本号，两个渠道分别发布：
 - 一轮里的多次模型尝试（重试、失败等）会分别计入；失败调用如果 provider 没有返回 usage，则无法计入。
 - 只统计当前载入 Host 的会话；未打开的历史会话在进入后按需计算。
 - provider 返回的 `totalTokens` 与三档明细不一致时，保留三档明细并把该轮标为“部分未定价/不完整”，不再整条丢弃，避免大幅少报。
-- 当 DSH 的 Web 搜索或抓取使用 DeepSeek 自带的 `deepseek-official` / `deepseek-search-api` / `deepseek-fetch-api` 时，按 DeepSeek 官方价把 **Search/Fetch 按次费**（¥5 / 1,000 次成功请求，2026-11-01 00:00 北京时间起）计入合计；DuckDuckGo、Tavily、普通 HTTP 抓取等不收费的 provider 不会被计费。一次 `web_search` 含多个 query 时按一次成功工具调用计，可能低估其中多个 query 各自的按次费。
+- 当 DSH 的 Web 搜索或抓取使用 DeepSeek 独立的 `deepseek-search-api` / `deepseek-fetch-api` 时，按 DeepSeek 官方价把 **Search/Fetch 按次费**（¥5 / 1,000 次成功请求，2026-11-01 00:00 北京时间起）计入合计；Messages 搜索（`deepseek-official`）在模型回合内完成，费用已随该次请求的 token 计入，因此不再重复收按次费。DuckDuckGo、Tavily、普通 HTTP 抓取等不收费的 provider 不会被计费。一次 `web_search` 含多个 query 时按一次成功工具调用计，可能低估其中多个 query 各自的按次费。
 - 第三方价格是静态配置，不会自动跟随官网调价；内置节假日表目前只覆盖 2026 年，2027 年起需更新 `DEEPSEEK_HOLIDAYS`。
 
 ### 开发
@@ -164,7 +164,7 @@ node --test test/*.test.mjs
 - **Per-turn model and amount** at the end of each turn, together with the turn's cache-hit rate.
 - **Configurable turn tail**: a master switch for the turn tail, plus individual toggles for models, provider names, cost, tokens, cache-hit rate, and text labels; adjust font size, spacing, and weight; or disable the picker takeover to restore the built-in DSH picker. The composer cost estimate has its own switch.
 - **Session summary** below the composer plus a detail panel grouped by turn and by model.
-- **DeepSeek Search/Fetch per-request fees**: when DSH web search or fetch runs on DeepSeek's own providers, the official fee of ¥5 per 1,000 successful requests is included, with search and fetch billed counts shown separately in the detail panel.
+- **DeepSeek Search/Fetch per-request fees**: when DSH web search or fetch runs on DeepSeek's standalone Search / Fetch APIs, the official fee of ¥5 per 1,000 successful requests is included, with search and fetch billed counts shown separately in the detail panel.
 - **Historical prices and unpriced routes**: the "Historical prices" section in Settings lets you add, edit, or remove prices for models no longer in your order without re-adding them. Removing a model from the list keeps its price, so historical calls still bill correctly; when the name is unknown, the raw model id is shown. Unpriced calls share one notice that can be switched off.
 - **DeepSeek is billed too**, using the same three-price formula and the event's timestamp.
 
@@ -235,7 +235,7 @@ Order and prices live in `~/.dsh/model-billing.json` (or `$DSH_HOME/model-billin
 - Multiple attempts within a turn are counted separately; failed calls without provider usage cannot be counted.
 - Only sessions loaded by the current Host are counted.
 - When a provider's `totalTokens` disagrees with its three buckets, the buckets are kept and the turn is marked partial instead of being dropped, which avoids large under-reporting.
-- When DSH web search or fetch runs on DeepSeek's own `deepseek-official`, `deepseek-search-api`, or `deepseek-fetch-api` providers, the DeepSeek **Search/Fetch per-request fee** (¥5 per 1,000 successful requests, from 2026-11-01 00:00 Beijing time) is included. Free providers such as DuckDuckGo, Tavily, and plain HTTP fetch are never charged. A `web_search` call containing several queries is counted as one successful tool call, so the per-query part may be understated.
+- When DSH web search or fetch runs on DeepSeek's standalone `deepseek-search-api` / `deepseek-fetch-api` providers, the DeepSeek **Search/Fetch per-request fee** (¥5 per 1,000 successful requests, from 2026-11-01 00:00 Beijing time) is included. Messages search (`deepseek-official`) runs inside a model turn, so its cost already arrives as that turn's tokens and is not charged again per request. Free providers such as DuckDuckGo, Tavily, and plain HTTP fetch are never charged. A `web_search` call containing several queries is counted as one successful tool call, so the per-query part may be understated.
 - Third-party prices are static and are not refreshed automatically. The bundled holiday table covers 2026 only; update `DEEPSEEK_HOLIDAYS` for 2027 onward.
 
 ### Development
