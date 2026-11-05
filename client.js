@@ -2260,7 +2260,10 @@ window.__ModuleLoader__.load({
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
           id: 'model-billing',
-          order: 12,
+          // Native sections run -10..20 (account, general, models, plugins,
+          // agent presets); third-party pages start at 25 so they sit below
+          // the native group instead of splitting it.
+          order: 25,
           label: () => t('nav'),
         }, SettingsSection))
 
