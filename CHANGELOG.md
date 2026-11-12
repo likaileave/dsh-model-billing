@@ -10,18 +10,6 @@
 
 - The settings page now follows the new visual language: a header icon and intro, grouped cards, and inline switches and selects. The available settings and how they are saved are unchanged.
 
-### 修复
-
-- 深色主题下设置页主按钮与开启态开关的滑块对比度过低，文字几乎不可读；主按钮文字改用底色绘制，开启态滑块与按钮底色保持一致。
-- 设置页下拉框被旧样式整条覆盖（高度、背景、内边距与同页其他控件不一致），已统一为同一套控件外观。
-- 费用估算弹层里「未定价路由」的补充价格编辑器丢失布局，输入框被挤成竖排、保存按钮另起一行；恢复为一行排列。
-
-### Fixed
-
-- In dark themes the settings page's primary buttons and the knobs of enabled switches had too little contrast, leaving their text nearly unreadable; primary-button text now uses the surface color, and enabled knobs match the button background.
-- Settings-page selects were completely overridden by a stale rule (height, background, and padding disagreed with every other control on the page); they now share one control style.
-- The add-price editor for unpriced routes in the cost panel lost its layout, stacking the inputs vertically and pushing the save button onto its own line; it lays out as a single row again.
-
 ## [0.3.2] - 2026-11-05
 
 ### 变更
