@@ -100,6 +100,10 @@ window.__ModuleLoader__.load({
         turnCost: '费用',
         turnTokens: '本轮 Token',
         displaySection: '轮尾显示',
+        displayFields: '显示项目',
+        displayLook: '外观',
+        modelsSection: '模型顺序与单价',
+        modelsHint: '↑ / ↓ 决定选择器里的排列；单价按每百万 tokens 填写，三项留空即恢复官方价。',
         displayTurnTail: '启用轮尾显示',
         displayDock: '显示输入框下方费用估算',
         dockSection: '输入框下方费用估算',
@@ -216,6 +220,10 @@ window.__ModuleLoader__.load({
         turnCost: 'Cost',
         turnTokens: 'Turn tokens',
         displaySection: 'Turn-tail display',
+        displayFields: 'Shown items',
+        displayLook: 'Appearance',
+        modelsSection: 'Model order and prices',
+        modelsHint: 'The arrows set the picker order; prices are per million tokens, and leaving all three blank restores the official table.',
         displayTurnTail: 'Show the turn tail',
         displayDock: 'Show the composer cost estimate',
         dockSection: 'Composer cost estimate',
@@ -623,44 +631,79 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
 
     const CSS = `
-      .mb-page { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; padding: 4px 0 28px; }
+      .mb-page { max-width: 780px; padding: 6px 2px 48px; color: var(--dsw-alias-label-primary, #e8e8ea); font: 13px/1.5 var(--ds-font-family, system-ui, -apple-system, "Segoe UI", sans-serif); }
       .mb-page * { box-sizing: border-box; }
-      .mb-title { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
-      .mb-intro { margin: 0 0 14px; color: var(--dsw-alias-label-secondary); max-width: 760px; }
-      .mb-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
-      .mb-muted { color: var(--dsw-alias-label-secondary); }
+      .mb-hero { display: flex; align-items: flex-start; gap: 14px; margin: 0 0 16px; }
+      .mb-mark { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; overflow: hidden; line-height: 0; }
+      .mb-mark svg { width: 42px; height: 42px; display: block; }
+      .mb-hero h2 { margin: 0 0 4px; font-size: 20px; line-height: 1.25; font-weight: 650; }
+      .mb-hero p { margin: 0; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12.5px; }
+      .mb-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
+      .mb-bar-count { color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; }
+      .mb-muted { color: var(--dsw-alias-label-secondary, #a5a5ad); }
       .mb-spacer { flex: 1; }
-      .mb-btn { appearance: none; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); border-radius: 7px; height: 30px; padding: 0 12px; font: inherit; cursor: pointer; }
-      .mb-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2); }
-      .mb-btn:disabled { opacity: .45; cursor: default; }
-      .mb-btn-primary { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); font-weight: 600; }
-      .mb-btn-primary:hover:not(:disabled) { background: var(--dsw-alias-brand-primary); opacity: .9; }
+      .mb-btn { appearance: none; height: 30px; padding: 0 11px; border: 1px solid var(--dsw-alias-border-l2, #3a3a3d); border-radius: 7px; background: var(--dsw-alias-bg-layer-1, #202024); color: var(--dsw-alias-label-primary, #e8e8ea); font: inherit; font-size: 12px; cursor: pointer; }
+      .mb-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2, #26262a); }
+      .mb-btn:disabled { opacity: 1; color: var(--dsw-alias-label-secondary, #a5a5ad); border-color: var(--dsw-alias-border-l1, rgba(255, 255, 255, .1)); background: var(--dsw-alias-bg-layer-1, #202024); cursor: default; }
+      .mb-btn-primary { background: var(--dsw-alias-brand-primary, #3b82f6); border-color: var(--dsw-alias-brand-primary, #3b82f6); color: var(--dsw-alias-bg-base, #14141a); font-weight: 600; }
+      .mb-btn-primary:hover:not(:disabled) { opacity: .9; }
+      .mb-btn-primary:disabled { background: var(--dsw-alias-bg-layer-2, #26262a); border-color: var(--dsw-alias-border-l2, #3a3a3d); color: var(--dsw-alias-label-secondary, #a5a5ad); }
       .mb-btn-icon { width: 28px; height: 28px; padding: 0; font-size: 13px; }
-      .mb-status { color: var(--dsw-alias-label-secondary); min-height: 18px; }
-      .mb-status[data-tone="error"] { color: var(--dsw-alias-state-error-primary); }
-      .mb-status[data-tone="success"] { color: var(--dsw-alias-state-success-primary); }
-      .mb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 980px; }
-      .mb-card { border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-1); border-radius: 10px; padding: 12px 14px; }
-      .mb-card-head { display: flex; align-items: flex-start; gap: 12px; }
-      .mb-index { width: 26px; height: 26px; border-radius: 7px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); display: grid; place-items: center; font-variant-numeric: tabular-nums; flex: none; }
-      .mb-name { font-weight: 600; font-size: 14px; }
-      .mb-sub { color: var(--dsw-alias-label-secondary); font-size: 12px; overflow-wrap: anywhere; }
-      .mb-head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-      .mb-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 500; vertical-align: 1px; }
+      .mb-status { min-height: 18px; margin: 2px 2px 0; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; }
+      .mb-status[data-tone="error"] { color: var(--dsw-alias-state-error-primary, #f85149); }
+      .mb-status[data-tone="success"] { color: var(--dsw-alias-state-success-primary, #3fb950); }
+      .mb-group { margin-top: 16px; border: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .1)); border-radius: 12px; background: var(--dsw-alias-bg-layer-1, #202024); overflow: hidden; }
+      .mb-group-head { padding: 13px 16px 11px; border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .08)); }
+      .mb-group-head h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+      .mb-group-head p { margin: 3px 0 0; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; }
+      .mb-group-body { padding: 0 16px; }
+      .mb-row { display: flex; align-items: center; gap: 18px; min-height: 52px; padding: 10px 0; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); }
+      .mb-row:first-child { border-top: 0; }
+      .mb-row.is-disabled { opacity: .48; }
+      .mb-row-copy { flex: 1; min-width: 0; }
+      .mb-row-label { font-size: 12.8px; font-weight: 500; }
+      .mb-row-desc { margin-top: 2px; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11.5px; }
+      .mb-row-control { flex: none; display: flex; align-items: center; gap: 6px; }
+      .mb-subhead { padding: 12px 0 2px; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); }
+      .mb-subhead:first-child { border-top: 0; }
+      .mb-switch { position: relative; width: 38px; height: 22px; padding: 0; border: 1px solid var(--dsw-alias-border-l2, #3a3a3d); border-radius: 999px; background: var(--dsw-alias-bg-layer-2, #26262a); cursor: pointer; transition: background .14s ease, border-color .14s ease; }
+      .mb-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .14s ease; }
+      .mb-switch[aria-checked="true"] { border-color: transparent; background: var(--dsw-alias-brand-primary, #3b82f6); }
+      .mb-switch[aria-checked="true"]::after { transform: translateX(16px); background: var(--dsw-alias-bg-base, #14141a); }
+      .mb-switch:disabled { opacity: .38; cursor: not-allowed; }
+      .mb-switch:focus-visible, .mb-btn:focus-visible, .mb-select:focus-visible, .mb-input:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #3b82f6); outline-offset: 2px; }
+      .mb-select { max-width: 230px; height: 28px; padding: 0 28px 0 9px; border: 1px solid var(--dsw-alias-border-l2, #3a3a3d); border-radius: 7px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-primary, #e8e8ea); font: inherit; font-size: 12px; cursor: pointer; }
+      .mb-select:disabled { cursor: not-allowed; opacity: .5; }
+      .mb-model { padding: 12px 0; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); }
+      .mb-model:first-child { border-top: 0; }
+      .mb-model-head { display: flex; align-items: flex-start; gap: 10px; }
+      .mb-index { flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11px; font-variant-numeric: tabular-nums; }
+      .mb-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.8px; font-weight: 500; }
+      .mb-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mb-sub { margin-top: 2px; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11.5px; overflow-wrap: anywhere; }
+      .mb-head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+      .mb-tag { display: inline-block; padding: 1px 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 10.5px; font-weight: 500; white-space: nowrap; }
       .mb-tag-excluded { color: var(--dsw-alias-state-warn-primary); }
-      .mb-prices { display: grid; gap: 10px; margin-top: 12px; }
-      .mb-price-group { border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; padding: 10px 12px 12px; }
-      .mb-price-group-title { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; font-weight: 600; }
+      .mb-model-body { margin: 10px 0 0 32px; display: grid; gap: 10px; }
+      .mb-price-group { border: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .08)); border-radius: 9px; padding: 10px 12px 12px; }
+      .mb-price-group-title { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; }
       .mb-price-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
       .mb-card-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
       .mb-field { display: grid; gap: 4px; min-width: 0; }
-      .mb-field-label { color: var(--dsw-alias-label-secondary); font-size: 11px; }
-      .mb-input { width: 100%; height: 30px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
-      .mb-input:focus { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -1px; }
-      .mb-note { margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
-      .mb-warn { margin: 6px 0 0; color: var(--dsw-alias-state-warn-primary); font-size: 12px; }
-      .mb-empty { border: 1px dashed var(--dsw-alias-border-l2); border-radius: 10px; padding: 28px; text-align: center; color: var(--dsw-alias-label-secondary); }
-      .mb-footer-note { max-width: 980px; margin-top: 14px; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+      .mb-field-label { color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11px; }
+      .mb-input { width: 100%; height: 30px; border: 1px solid var(--dsw-alias-border-l2, #3a3a3d); border-radius: 7px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-primary, #e8e8ea); padding: 0 9px; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; }
+      .mb-input:focus { border-color: var(--dsw-alias-brand-primary, #3b82f6); }
+      .mb-note { margin: 8px 0 0; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; }
+      .mb-warn { margin: 6px 0 0; color: var(--dsw-alias-state-warn-primary, #d29922); font-size: 12px; }
+      .mb-empty { border: 1px dashed var(--dsw-alias-border-l2, #3a3a3d); border-radius: 10px; padding: 22px; text-align: center; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; }
+      .mb-footer-note { margin: 12px 2px 0; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11.5px; }
+      .mb-archive-row { padding: 11px 0; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); display: grid; gap: 8px; }
+      .mb-archive-row:first-child { border-top: 0; }
+      .mb-archive-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+      .mb-archive-actions { display: flex; gap: 8px; padding: 11px 0; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); }
+      .mb-route-editor { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 10px 0 0; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); }
+      .mb-route-editor .mb-input { flex: 1 1 104px; width: auto; min-width: 84px; }
+      .mb-route-editor .mb-btn { flex: none; }
       .mb-dock { align-self: center; display: flex; flex-direction: column; align-items: flex-start; color: var(--dsw-alias-label-tertiary); font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px); line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px)); }
       .mb-dock-trigger { appearance: none; border: 0; background: transparent; color: inherit; font: inherit; line-height: inherit; padding: 1px 8px; border-radius: var(--dsw-radius-sm); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-align: left; max-width: 100%; flex-wrap: nowrap; }
       .mb-dock-trigger:hover, .mb-dock-trigger[aria-expanded="true"] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }
@@ -706,36 +749,12 @@ window.__ModuleLoader__.load({
       .mb-turn[data-weight="bold"] { font-weight: 600; }
       .mb-turn[data-weight="bold"] strong { font-weight: 600; }
       .mb-turn-partial { color: var(--dsw-alias-state-warn-primary); }
-      .mb-display { border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 12px 14px; margin: 10px 0 14px; background: var(--dsw-alias-bg-layer-2); }
-      .mb-display-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-      .mb-display-title { font-weight: 600; }
-      .mb-display-hint { color: var(--dsw-alias-label-secondary); font-size: 12px; }
-      .mb-check-grid { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-      .mb-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
-      .mb-check.is-disabled { opacity: .55; cursor: default; }
-      .mb-check input { width: 15px; height: 15px; accent-color: var(--dsw-alias-brand-primary); }
-      .mb-display-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 12px; }
-      .mb-archive-list { display: flex; flex-direction: column; gap: 8px; }
-      .mb-archive-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
-      .mb-archive-row .mb-archive-provider { grid-column: 1; grid-row: 1; min-width: 0; }
-      .mb-archive-row .mb-archive-model { grid-column: 2; grid-row: 1; min-width: 0; }
-      .mb-archive-row > .mb-btn { grid-column: 3; grid-row: 1; }
-      .mb-archive-row .mb-archive-price { grid-row: 2; min-width: 0; }
-      .mb-route-editor { display: flex; flex-wrap: wrap; }
-      .mb-route-editor .mb-input { flex: 1 1 120px; min-width: 110px; }
-      .mb-route-editor .mb-btn { flex: 0 0 auto; }
-      .mb-archive-actions { display: flex; gap: 8px; margin-top: 10px; }
-      .mb-master { display: flex; align-items: center; gap: 10px; padding: 10px 0 4px; font-size: 15px; font-weight: 600; cursor: pointer; }
-      .mb-master input { width: 16px; height: 16px; flex: 0 0 auto; }
-      .mb-master-label { line-height: 1.4; }
-      .mb-master-hint { color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 400; }
-      .mb-subchecks { margin: 2px 0 0 26px; }
       .mb-tag.is-muted { color: var(--dsw-alias-label-secondary); }
       @media (max-width: 720px) {
-        .mb-subchecks { margin-left: 18px; }
+        .mb-group-head { padding: 11px 12px 9px; }
+        .mb-group-body { padding: 0 12px; }
+        .mb-model-body { margin-left: 0; }
       }
-      .mb-select { height: 30px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 0 8px; font: inherit; }
-      .mb-select:focus { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -1px; }
       .mb-picker { position: relative; display: flex; min-width: 0; }
       .mb-picker-trigger { border-radius: var(--dsw-radius-sm); min-width: 0; max-width: min(360px, 45cqw); height: 28px; color: var(--dsw-alias-label-secondary); cursor: pointer; background: 0 0; border: none; outline: none; align-items: center; gap: 4px; padding: 0 4px 0 8px; font-size: 13px; font-weight: 400; line-height: 20px; display: flex; }
       .mb-picker-trigger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
@@ -965,135 +984,150 @@ window.__ModuleLoader__.load({
         setStatus(null)
       }
 
-      const masterToggle = (field, label, hint) => h('label', { className: 'mb-master' },
-        h('input', {
-          type: 'checkbox',
-          checked: displayValue[field] === true,
-          onChange: (event) => updateDisplay({ [field]: event.target.checked }),
+      const HERO_ICON = h('svg', {
+        viewBox: '0 0 64 64',
+        width: 42,
+        height: 42,
+        'aria-hidden': true,
+        focusable: 'false',
+      },
+        h('defs', null,
+          h('linearGradient', { id: 'mb-hero-coin', x1: 8, y1: 6, x2: 56, y2: 58, gradientUnits: 'userSpaceOnUse' },
+            h('stop', { offset: 0, stopColor: '#1f8a8a' }),
+            h('stop', { offset: 1, stopColor: '#185a9d' }))),
+        h('rect', { x: 4, y: 4, width: 56, height: 56, rx: 14, fill: 'url(#mb-hero-coin)' }),
+        h('circle', { cx: 32, cy: 32, r: 19, fill: 'none', stroke: '#ffffff', strokeOpacity: 0.9, strokeWidth: 2.4 }),
+        h('path', {
+          d: 'M25 23l7 9 7-9',
+          fill: 'none',
+          stroke: '#ffffff',
+          strokeWidth: 2.8,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
         }),
-        h('span', { className: 'mb-master-label' }, translate(label)),
-        hint === undefined ? null : h('span', { className: 'mb-master-hint' }, hint))
+        h('path', { d: 'M32 32v11M25.5 31.5h13M25.5 36.5h13', fill: 'none', stroke: '#ffffff', strokeWidth: 2.4, strokeLinecap: 'round' }),
+        h('path', { d: 'M18 47.5h8M28 47.5h8M38 47.5h8', stroke: '#ffffff', strokeOpacity: 0.55, strokeWidth: 2, strokeLinecap: 'round' }))
+
+      const renderHero = () => h('header', { className: 'mb-hero' },
+        h('span', { className: 'mb-mark' }, HERO_ICON),
+        h('div', null,
+          h('h2', null, translate('title')),
+          h('p', null, translate('intro'))))
+
+      const switchControl = (checked, onChange, label, disabled = false) => h('button', {
+        type: 'button',
+        role: 'switch',
+        className: 'mb-switch',
+        'aria-checked': checked ? 'true' : 'false',
+        'aria-label': label,
+        title: label,
+        disabled,
+        onClick: () => onChange(!checked),
+      })
+
+      const row = (label, description, control, disabled = false, key) => h('div', {
+        className: 'mb-row' + (disabled ? ' is-disabled' : ''),
+        key,
+      },
+        h('div', { className: 'mb-row-copy' },
+          h('div', { className: 'mb-row-label' }, label),
+          description === undefined ? null : h('div', { className: 'mb-row-desc' }, description)),
+        h('div', { className: 'mb-row-control' }, control))
+
+      const group = (title, description, ...children) => h('section', { className: 'mb-group' },
+        h('header', { className: 'mb-group-head' },
+          h('h3', null, title),
+          description === undefined ? null : h('p', null, description)),
+        h('div', { className: 'mb-group-body' }, children))
+
+      const toggleRow = (field, label, disabled = false) => row(
+        translate(label),
+        undefined,
+        switchControl(displayValue[field] === true, (next) => updateDisplay({ [field]: next }), translate(label), disabled),
+        disabled,
+        field)
 
       const renderDisplaySettings = () => h(Fragment, null,
-        h('div', { className: 'mb-display' },
-          h('div', { className: 'mb-display-head' },
-            h('div', { className: 'mb-display-title' }, translate('displaySection')),
-            h('div', { className: 'mb-display-hint' }, translate('displayHint'))),
-          masterToggle('showTurnTail', 'displayTurnTail'),
-          h('div', { className: 'mb-check-grid mb-subchecks' },
-            [
-              ['showProvider', 'displayProvider'],
-              ['showModels', 'displayModels'],
-              ['showCost', 'displayCost'],
-              ['showTokens', 'displayTokens'],
-              ['showCacheHit', 'displayCacheHit'],
-              ['showLabels', 'displayLabels'],
-            ].map(([field, label]) => {
-              const disabled = displayValue.showTurnTail !== true ||
-                (field === 'showProvider' && displayValue.showModels !== true)
-              return h('label', {
-                className: `mb-check${disabled ? ' is-disabled' : ''}`,
-                key: field,
-              },
-                h('input', {
-                  type: 'checkbox',
-                  checked: displayValue[field] === true,
-                  disabled,
-                  onChange: (event) => updateDisplay({ [field]: event.target.checked }),
-                }),
-                h('span', null, translate(label)))
-            })),
-          h('div', { className: 'mb-display-controls' },
-            h('label', { className: 'mb-field' },
-              h('span', { className: 'mb-field-label' }, translate('displayFontSize')),
-              h('select', {
-                className: 'mb-select',
-                value: displayValue.fontSize,
-                onChange: (event) => updateDisplay({ fontSize: event.target.value }),
-              },
-                h('option', { value: 'small' }, translate('fontSizeSmall')),
-                h('option', { value: 'normal' }, translate('fontSizeNormal')),
-                h('option', { value: 'large' }, translate('fontSizeLarge')))),
-            h('label', { className: 'mb-field' },
-              h('span', { className: 'mb-field-label' }, translate('displayDensity')),
-              h('select', {
-                className: 'mb-select',
-                value: displayValue.density,
-                onChange: (event) => updateDisplay({ density: event.target.value }),
-              },
-                h('option', { value: 'compact' }, translate('densityCompact')),
-                h('option', { value: 'comfortable' }, translate('densityComfortable')))),
-            h('label', { className: 'mb-field' },
-              h('span', { className: 'mb-field-label' }, translate('displayWeight')),
-              h('select', {
-                className: 'mb-select',
-                value: displayValue.fontWeight,
-                onChange: (event) => updateDisplay({ fontWeight: event.target.value }),
-              },
-                h('option', { value: 'normal' }, translate('weightNormal')),
-                h('option', { value: 'bold' }, translate('weightBold')))))),
-        h('div', { className: 'mb-display' },
-          h('div', { className: 'mb-display-head' },
-            h('div', { className: 'mb-display-title' }, translate('dockSection')),
-            h('div', { className: 'mb-display-hint' }, translate('dockHint'))),
-          masterToggle('showDock', 'displayDock'),
-          h('div', { className: 'mb-check-grid mb-subchecks' },
-            h('label', { className: `mb-check${displayValue.showDock === true ? '' : ' is-disabled'}` },
-              h('input', {
-                type: 'checkbox',
-                checked: displayValue.showUnpricedNotice === true,
-                disabled: displayValue.showDock !== true,
-                onChange: (event) => updateDisplay({ showUnpricedNotice: event.target.checked }),
-              }),
-              h('span', null, translate('showUnpricedNotice'))))),
-        h('div', { className: 'mb-display' },
-          h('div', { className: 'mb-display-head' },
-            h('div', { className: 'mb-display-title' }, translate('pickerSection')),
-            h('div', { className: 'mb-display-hint' }, translate('takeoverHint'))),
-          h('label', { className: 'mb-check' },
-            h('input', {
-              type: 'checkbox',
-              checked: displayValue.takeoverPicker === true,
-              onChange: (event) => updateDisplay({ takeoverPicker: event.target.checked }),
-            }),
-            h('span', null, translate('takeoverPicker')))))
+        group(translate('pickerSection'), translate('takeoverHint'),
+          toggleRow('takeoverPicker', 'takeoverPicker')),
+        group(translate('dockSection'), translate('dockHint'),
+          toggleRow('showDock', 'displayDock'),
+          toggleRow('showUnpricedNotice', 'showUnpricedNotice', displayValue.showDock !== true)),
+        group(translate('displaySection'), translate('displayHint'),
+          toggleRow('showTurnTail', 'displayTurnTail'),
+          h('div', { className: 'mb-subhead' }, translate('displayFields')),
+          [
+            ['showProvider', 'displayProvider'],
+            ['showModels', 'displayModels'],
+            ['showCost', 'displayCost'],
+            ['showTokens', 'displayTokens'],
+            ['showCacheHit', 'displayCacheHit'],
+            ['showLabels', 'displayLabels'],
+          ].map(([field, label]) => {
+            const off = displayValue.showTurnTail !== true ||
+              (field === 'showProvider' && displayValue.showModels !== true)
+            return toggleRow(field, label, off)
+          }),
+          h('div', { className: 'mb-subhead' }, translate('displayLook')),
+          row(translate('displayFontSize'), undefined, h('select', {
+            className: 'mb-select',
+            value: displayValue.fontSize,
+            onChange: (event) => updateDisplay({ fontSize: event.target.value }),
+          },
+            h('option', { value: 'small' }, translate('fontSizeSmall')),
+            h('option', { value: 'normal' }, translate('fontSizeNormal')),
+            h('option', { value: 'large' }, translate('fontSizeLarge')))),
+          row(translate('displayDensity'), undefined, h('select', {
+            className: 'mb-select',
+            value: displayValue.density,
+            onChange: (event) => updateDisplay({ density: event.target.value }),
+          },
+            h('option', { value: 'compact' }, translate('densityCompact')),
+            h('option', { value: 'comfortable' }, translate('densityComfortable')))),
+          row(translate('displayWeight'), undefined, h('select', {
+            className: 'mb-select',
+            value: displayValue.fontWeight,
+            onChange: (event) => updateDisplay({ fontWeight: event.target.value }),
+          },
+            h('option', { value: 'normal' }, translate('weightNormal')),
+            h('option', { value: 'bold' }, translate('weightBold'))))))
 
-      const renderArchive = () => h('div', { className: 'mb-display' },
-        h('div', { className: 'mb-display-head' },
-          h('div', { className: 'mb-display-title' }, translate('archiveSection')),
-          h('div', { className: 'mb-display-hint' }, translate('archiveHint'))),
+      const renderArchive = () => group(translate('archiveSection'), translate('archiveHint'),
         archiveRows.length === 0
-          ? h('div', { className: 'mb-muted' }, translate('archiveEmpty'))
-          : h('div', { className: 'mb-archive-list' },
-            archiveRows.map((entry, index) => h('div', { className: 'mb-archive-row', key: index },
+          ? h('div', { className: 'mb-empty' }, translate('archiveEmpty'))
+          : archiveRows.map((entry, index) => h('div', { className: 'mb-archive-row', key: index },
+            h('div', { className: 'mb-archive-head' },
               h('input', {
-                className: 'mb-input mb-archive-provider',
+                className: 'mb-input',
                 placeholder: translate('archiveProvider'),
+                'aria-label': translate('archiveProvider'),
                 value: entry.provider,
                 onChange: (event) => updateArchive(index, (current) => ({ ...current, provider: event.target.value })),
               }),
               h('input', {
-                className: 'mb-input mb-archive-model',
+                className: 'mb-input',
                 placeholder: translate('archiveModel'),
+                'aria-label': translate('archiveModel'),
                 value: entry.model,
                 onChange: (event) => updateArchive(index, (current) => ({ ...current, model: event.target.value })),
               }),
-              ...PRICE_FIELDS.map((field) => h('input', {
-                key: field,
-                className: 'mb-input mb-archive-price',
-                inputMode: 'decimal',
-                placeholder: translate(PRICE_LABEL_KEYS[field]),
-                'aria-label': translate(PRICE_LABEL_KEYS[field]),
-                value: entry.pricing[field] ?? '',
-                onChange: (event) => updateArchivePrice(index, field, event.target.value),
-              })),
               h('button', {
                 type: 'button',
                 className: 'mb-btn',
                 title: translate('remove'),
                 'aria-label': translate('remove'),
                 onClick: () => removeArchive(index),
-              }, translate('remove'))))),
+              }, translate('remove'))),
+            h('div', { className: 'mb-price-grid' },
+              PRICE_FIELDS.map((field) => h('input', {
+                key: field,
+                className: 'mb-input',
+                inputMode: 'decimal',
+                placeholder: translate(PRICE_LABEL_KEYS[field]),
+                'aria-label': translate(PRICE_LABEL_KEYS[field]),
+                value: entry.pricing[field] ?? '',
+                onChange: (event) => updateArchivePrice(index, field, event.target.value),
+              }))))),
         h('div', { className: 'mb-archive-actions' },
           h('button', { type: 'button', className: 'mb-btn', onClick: addArchive }, translate('addArchive'))))
 
@@ -1174,7 +1208,7 @@ window.__ModuleLoader__.load({
         return h(Fragment, null,
           h(Style),
           h('section', { className: 'mb-page' },
-            h('h2', { className: 'mb-title' }, translate('title')),
+            renderHero(),
             snap.status === 'error'
               ? h('div', { className: 'mb-fatal' },
                 h('div', null, translate('loadFailed')),
@@ -1187,16 +1221,31 @@ window.__ModuleLoader__.load({
         return h(Fragment, null,
           h(Style),
           h('section', { className: 'mb-page' },
-            h('h2', { className: 'mb-title' }, translate('title')),
+            renderHero(),
             h('p', { className: 'mb-muted' }, translate('loading'))))
       }
 
-      const renderToolbar = () => h('div', { className: 'mb-toolbar' },
-        h('span', { className: 'mb-muted' }, translate('modelsCount', { count: models.length })),
+      const renderToolbar = () => h('div', { className: 'mb-bar' },
+        h('span', { className: 'mb-bar-count' }, translate('modelsCount', { count: models.length })),
         h('span', { className: 'mb-spacer' }),
-        dirty ? h('span', { className: 'mb-muted' }, translate('unsaved')) : null,
+        dirty ? h('span', { className: 'mb-bar-count' }, translate('unsaved')) : null,
         h('button', { type: 'button', className: 'mb-btn', disabled: !dirty || saving, onClick: reset }, translate('undo')),
         h('button', { type: 'button', className: 'mb-btn mb-btn-primary', disabled: !dirty || saving, onClick: () => void save() }, saving ? translate('saving') : translate('save')))
+
+      const renderModels = () => group(translate('modelsSection'), translate('modelsHint'),
+        models.length === 0
+          ? h('div', { className: 'mb-empty' }, translate('noModels'))
+          : models.map((entry, index) => h(SettingsModelCard, {
+            key: `${entry.provider}\u0000${entry.model}`,
+            entry,
+            index,
+            count: models.length,
+            translate,
+            onMove: move,
+            onUpdatePrice: updatePrice,
+            onResetPricing: resetPricing,
+            onRestoreOfficial: restoreOfficialPricing,
+          })))
 
       if (models.length === 0) {
         // The display controls stay editable with no models configured, so the
@@ -1204,36 +1253,24 @@ window.__ModuleLoader__.load({
         return h(Fragment, null,
           h(Style),
           h('section', { className: 'mb-page' },
-            h('h2', { className: 'mb-title' }, translate('title')),
-            h('p', { className: 'mb-intro' }, translate('intro')),
+            renderHero(),
             renderToolbar(),
             status === null ? null : h('div', { className: 'mb-status', 'data-tone': status.tone, role: 'status' }, status.text),
             renderDisplaySettings(),
+            renderModels(),
             renderArchive(),
-            h('div', { className: 'mb-empty' }, translate('noModels'))))
+            h('p', { className: 'mb-footer-note' }, translate('formula')),
+            h('p', { className: 'mb-footer-note' }, translate('formulaNote'))))
       }
 
       return h(Fragment, null,
         h(Style),
         h('section', { className: 'mb-page' },
-          h('h2', { className: 'mb-title' }, translate('title')),
-          h('p', { className: 'mb-intro' }, translate('intro')),
+          renderHero(),
           renderToolbar(),
           status === null ? null : h('div', { className: 'mb-status', 'data-tone': status.tone, role: 'status' }, status.text),
           renderDisplaySettings(),
-          h('p', { className: 'mb-note' }, translate('orderHint')),
-          h('ul', { className: 'mb-list' },
-            models.map((entry, index) => h(SettingsModelCard, {
-              key: `${entry.provider}\u0000${entry.model}`,
-              entry,
-              index,
-              count: models.length,
-              translate,
-              onMove: move,
-              onUpdatePrice: updatePrice,
-              onResetPricing: resetPricing,
-              onRestoreOfficial: restoreOfficialPricing,
-            }))),
+          renderModels(),
           renderArchive(),
           h('p', { className: 'mb-footer-note' }, translate('formula')),
           h('p', { className: 'mb-footer-note' }, translate('formulaNote'))))
@@ -1260,12 +1297,12 @@ window.__ModuleLoader__.load({
           }))
       })
 
-      return h('li', { className: 'mb-card' },
-        h('div', { className: 'mb-card-head' },
-          h('div', { className: 'mb-index' }, index + 1),
-          h('div', { style: { minWidth: 0 } },
+      return h('div', { className: 'mb-model' },
+        h('div', { className: 'mb-model-head' },
+          h('span', { className: 'mb-index' }, index + 1),
+          h('div', { style: { minWidth: 0, flex: 1 } },
             h('div', { className: 'mb-name' },
-              entry.name,
+              h('span', { className: 'mb-name-text' }, entry.name),
               entry.isDeepSeek ? h('span', { className: 'mb-tag' }, translate('deepseekTag')) : null),
             h('div', { className: 'mb-sub' }, `${entry.providerName} · ${entry.provider} / ${entry.model}`)),
           h('div', { className: 'mb-head-actions' },
@@ -1285,8 +1322,8 @@ window.__ModuleLoader__.load({
               'aria-label': translate('down'),
               onClick: () => onMove(index, 1),
             }, '↓'))),
-        entry.isDeepSeek ? h('p', { className: 'mb-note' }, translate('deepseekNote')) : null,
-        h('div', { className: 'mb-prices' },
+        h('div', { className: 'mb-model-body' },
+          entry.isDeepSeek ? h('p', { className: 'mb-note', style: { margin: 0 } }, translate('deepseekNote')) : null,
           h('div', { className: 'mb-price-group' },
             h('div', { className: 'mb-price-group-title' },
               h('span', null, builtin ? translate('officialPrice') : translate('singlePrice')),
@@ -1520,7 +1557,7 @@ window.__ModuleLoader__.load({
         : unpricedRoutes.find((route) => `${route.provider}\u0000${route.model}` === editingRoute) ?? null
       const routeEditor = editingRouteRow === null
         ? null
-        : h('div', { className: 'mb-archive-row mb-route-editor', style: { marginTop: '8px' } },
+        : h('div', { className: 'mb-route-editor' },
           h('span', { className: 'mb-muted' }, `${editingRouteRow.provider} / ${editingRouteRow.model}`),
           ...PRICE_FIELDS.map((field) => h('input', {
             key: field,
