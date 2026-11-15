@@ -30,7 +30,7 @@
 
 - **自定义模型顺序**：在“设置 → 模型与费用”中用 ↑ / ↓ 调整已配置模型的顺序。模型选择器按这个顺序展示，跨提供方也保持你排的顺序，并用提供方名称分组。
 - **三档 token 价格**：每个模型可填写每百万 tokens 的缓存命中输入、缓存未命中输入、输出价格。`0` 是有效价格，留空表示未设置。
-- **DeepSeek 官方价内置**：`deepseek-flash` 和 `deepseek-v4-pro` 默认使用 DeepSeek 官网的峰谷价，并在设置页标明“官方价”；填入完整的三档自定义价即可覆盖官方价，标为“自定义”。
+- **DeepSeek 官方价内置**：`deepseek-flash`（含 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp` 等同价别名）和 `deepseek-v4-pro` 默认使用 DeepSeek 官网的峰谷价，并在设置页标明“官方价”；填入完整的三档自定义价即可覆盖官方价，标为“自定义”。
 - **逐轮费用与使用模型**：每轮结束后在轮尾显示这一轮使用的模型，以及该轮费用和缓存命中率。
 - **可配置轮尾**：在设置中总开关轮尾显示，并可分别开关使用模型、模型提供商、费用、token、缓存命中率、文字标签，调整字号、间距和字重；也可以关闭选择器接管，恢复 DSH 内置模型选择器。输入框下方的费用估算另有独立开关。
 - **本会话费用**：输入框下方显示本会话累计估算、最近一轮费用和缓存命中率；展开后可查看按轮次和按模型的明细。
@@ -44,7 +44,7 @@
 缓存命中输入 × 命中价
 +（未缓存输入 + 缓存写入）× 未命中价
 + 输出 × 输出价
-+ DeepSeek Search/Fetch 成功请求次数 × 单次价
++ DeepSeek Search/Fetch 成功请求次数 × 单次价（含模型内联网搜索，每次成功工具调用记 1 次）
 ```
 
 价格单位是“元 / 百万 tokens”；Search/Fetch 按次计费，单次价为 ¥0.005（¥5 / 1,000 次成功请求）。缓存写入按缓存未命中价计算，这是三档价格模型下的近似处理。金额来自会话日志中的 provider usage 与工具结果，实际账单以 provider 为准。
@@ -59,6 +59,8 @@
 | deepseek-flash | 空闲 | 0.02 | 1 | 4 |
 | deepseek-v4-pro | 高峰 | 0.30 | 9 | 27 |
 | deepseek-v4-pro | 空闲 | 0.15 | 4.5 | 13.5 |
+
+`deepseek-v4-flash` 和 `deepseek-v4-flash-vision-exp` 与 `deepseek-flash` 同价，表里不再重复列出。
 
 高峰时段为北京时间周一至周五 `9:00–12:00`、`14:00–18:00`（中国法定节假日除外）；其余时间、周末和法定节假日全天为空闲时段。空闲价是高峰价的一半。
 
@@ -102,7 +104,7 @@ git clone https://github.com/likaileave/dsh-model-billing.git
 dsh plugin --profile desktop add ./dsh-model-billing
 ```
 
-安装或更新后刷新 Web 页面。设置页位于“模型与费用”。
+安装或更新后**重启 DSH**（桌面版没有刷新或重载命令，插件代码只在页面启动时从磁盘读取）。设置页位于“模型与费用”。
 
 ### 发布
 
@@ -160,7 +162,7 @@ node --test test/*.test.mjs
 
 - **Custom model order** in Settings → Models & Cost; the composer picker follows that order across providers and groups models by provider.
 - **Three prices per model**: cache-hit input, cache-miss input, and output, in CNY per million tokens. `0` is a valid price; blank means unset.
-- **Built-in official DeepSeek pricing** for `deepseek-flash` and `deepseek-v4-pro`, selected per usage event between peak and off-peak Beijing time. A complete set of custom prices overrides the table and is labelled "Custom".
+- **Built-in official DeepSeek pricing** for `deepseek-flash` (and the same-rate aliases `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp`) and `deepseek-v4-pro`, selected per usage event between peak and off-peak Beijing time. A complete set of custom prices overrides the table and is labelled "Custom".
 - **Per-turn model and amount** at the end of each turn, together with the turn's cache-hit rate.
 - **Configurable turn tail**: a master switch for the turn tail, plus individual toggles for models, provider names, cost, tokens, cache-hit rate, and text labels; adjust font size, spacing, and weight; or disable the picker takeover to restore the built-in DSH picker. The composer cost estimate has its own switch.
 - **Session summary** below the composer plus a detail panel grouped by turn and by model.
@@ -174,10 +176,25 @@ node --test test/*.test.mjs
 cache-hit input × hit price
 + (uncached input + cache write) × miss price
 + output × output price
-+ DeepSeek Search/Fetch successful requests × per-request price
++ DeepSeek Search/Fetch successful requests × per-request price (in-turn web search counts one per successful tool call)
 ```
 
 Prices are CNY per million tokens; Search/Fetch is billed per request at ¥0.005 (¥5 per 1,000 successful requests). Cache writes are approximated at the cache-miss price. Figures come from provider usage and tool results in the session log; the provider's invoice is authoritative.
+
+### DeepSeek official prices
+
+The built-in table lives in [`host.js`](host.js) as `DEEPSEEK_PRICES`, in CNY per million tokens. Source: [DeepSeek models & pricing](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/) (checked 2026-10-19).
+
+| Model | Window | Cache hit | Cache miss | Output |
+|---|---|---:|---:|---:|
+| deepseek-flash | peak | 0.04 | 2 | 8 |
+| deepseek-flash | off-peak | 0.02 | 1 | 4 |
+| deepseek-v4-pro | peak | 0.30 | 9 | 27 |
+| deepseek-v4-pro | off-peak | 0.15 | 4.5 | 13.5 |
+
+`deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` share the `deepseek-flash` rate and are not repeated in the table.
+
+Peak windows are Beijing time Monday–Friday 9:00–12:00 and 14:00–18:00, excluding Chinese public holidays; weekends, holidays, and every other hour are off-peak at half the peak rate.
 
 The plugin ships **no third-party price defaults**. Enter your provider's actual rates in Settings → Models & Cost. Models without a complete three-price set are marked as unpriced and contribute no amount. DeepSeek prices come from the built-in official table; enter a complete custom set to override it, or clear all three fields to restore the official rates.
 
@@ -210,7 +227,7 @@ git clone https://github.com/likaileave/dsh-model-billing.git
 dsh plugin --profile desktop add ./dsh-model-billing
 ```
 
-Refresh the Web page after installing or updating.
+**Restart DSH** after installing or updating; the desktop build has no reload command and plugin code is read from disk only when the page starts.
 
 ### Release channels
 
