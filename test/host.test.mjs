@@ -506,14 +506,74 @@ test('charges DeepSeek web search once per successful tool call', () => {
   assert.equal(fetched.totals.toolCost, 0.005)
 })
 
+test('charges the Messages search provider as a per-call floor', () => {
+  const start = Date.parse('2026-11-01T00:00:00+08:00')
+  const call = (turn, callId, name, time) => ({
+    type: 'tool/call',
+    seq: 1,
+    time,
+    data: { turn, step: 1, callId, name, arguments: '{"queries":["x","y"]}' },
+  })
+  const result = (turn, callId, time, meta, isError = false) => ({
+    type: 'tool/result',
+    seq: 2,
+    time,
+    data: {
+      turn,
+      step: 1,
+      message: { toolCallId: callId, content: [{ type: 'text', text: 'ok' }], isError },
+      meta,
+    },
+  })
+  // The composition this machine uses: Messages search plus local HTTP fetch.
+  const billing = webToolBilling({
+    get: (name) => name === 'web'
+      ? { config: { searchProvider: { get: () => 'deepseek-official' }, fetchProvider: { get: () => 'http' } } }
+      : undefined,
+  })
+  assert.equal(billing.search, 0.005)
+  assert.equal(billing.fetch, null)
+
+  const priced = computeSessionUsage([
+    call(1, 's1', 'web_search', start + 1_000),
+    result(1, 's1', start + 2_000, { sources: [{ url: 'https://example.com' }] }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(priced.totals.webSearchCalls, 1)
+  assert.equal(priced.totals.webSearchBilled, 1)
+  assert.equal(priced.totals.toolCost, 0.005)
+
+  // A search that returns no sources is not billed.
+  const empty = computeSessionUsage([
+    call(1, 's2', 'web_search', start + 1_000),
+    result(1, 's2', start + 2_000, { sources: [] }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(empty.totals.webSearchBilled, 0)
+  assert.equal(empty.totals.toolCost, 0)
+
+  // Anything before the 2026-11-01 start is free.
+  const early = computeSessionUsage([
+    call(1, 's3', 'web_search', start - 1_000),
+    result(1, 's3', start - 500, { sources: [{ url: 'https://example.com' }] }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(early.totals.webSearchBilled, 0)
+
+  // The local HTTP fetch stays free even on a 200 response.
+  const fetched = computeSessionUsage([
+    call(1, 's4', 'web_fetch', start + 1_000),
+    result(1, 's4', start + 2_000, { statusCode: 200 }),
+  ], new Map(), new Map(), null, billing)
+  assert.equal(fetched.totals.webFetchCalls, 0)
+  assert.equal(fetched.totals.toolCost, 0)
+})
+
 test('detects only DeepSeek web providers as billable', () => {
   const ctx = (search, fetch) => ({
     get: (name) => name === 'web'
       ? { config: { searchProvider: { get: () => search }, fetchProvider: { get: () => fetch } } }
       : undefined,
   })
-  // Messages search runs inside a model turn, so it is token-billed, not per request.
-  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, null)
+  // The Messages search provider bills its server-side search per term too.
+  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, 0.005)
   assert.equal(webToolBilling(ctx('deepseek-official', 'http')).fetch, null)
   assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).search, 0.005)
   assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).fetch, 0.005)

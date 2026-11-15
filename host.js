@@ -30,11 +30,14 @@ const KEY_SEPARATOR = '\u0000'
 // tool/result per invocation, so the fee can be folded from the session log.
 const DEEPSEEK_WEB_TOOL_START = Date.parse('2026-11-01T00:00:00+08:00')
 const DEEPSEEK_WEB_TOOL_PRICE = 0.005
-// Only the standalone Search/Fetch APIs are billed per request. The Messages
-// search provider (`deepseek-official`) runs Anthropic's `web_search_20250305`
-// server tool inside a model turn, so its cost already arrives as prompt and
-// completion tokens; charging ¥0.005 there would bill the same call twice.
-const DEEPSEEK_SEARCH_PROVIDERS = new Set(['deepseek-search-api'])
+// Since 2026-11-01 the server-side search is billed separately from tokens:
+// ¥0.005 per successful query term, both for the standalone Search API and for
+// the search made inside a model turn. DSH's `deepseek-official` provider runs
+// Anthropic's `web_search_20250305` and the host drops `usage.server_tool_use`,
+// so one successful `web_search` tool call can only be counted as one term — a
+// floor that under-reports multi-term calls 2–3x. The tokens of the auxiliary
+// search request never reach the session log, so they stay invisible here.
+const DEEPSEEK_SEARCH_PROVIDERS = new Set(['deepseek-search-api', 'deepseek-official'])
 const DEEPSEEK_FETCH_PROVIDERS = new Set(['deepseek-fetch-api'])
 const DISPLAY_DEFAULTS = Object.freeze({
   showTurnTail: true,

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.4] - 2026-11-15
+
+### 修复
+
+- 服务端联网搜索的按次费不再漏计：DeepSeek 原生搜索（`deepseek-official`）现在按每次成功的搜索工具调用计入 ≥¥0.005，费用栏同步标注为下限。
+
+### Fixed
+
+- Per-request fees for server-side web search are no longer missed: DeepSeek's built-in search (`deepseek-official`) is now charged at ≥¥0.005 per successful search tool call, and the fee line marks the value as a floor.
+
 ## [0.3.3] - 2026-11-12
 
 ### 变更
