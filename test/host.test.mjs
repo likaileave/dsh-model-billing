@@ -506,7 +506,7 @@ test('charges DeepSeek web search once per successful tool call', () => {
   assert.equal(fetched.totals.toolCost, 0.005)
 })
 
-test('charges the Messages search provider as a per-call floor', () => {
+test('does not charge the in-turn Messages search', () => {
   const start = Date.parse('2026-11-01T00:00:00+08:00')
   const call = (turn, callId, name, time) => ({
     type: 'tool/call',
@@ -531,16 +531,18 @@ test('charges the Messages search provider as a per-call floor', () => {
       ? { config: { searchProvider: { get: () => 'deepseek-official' }, fetchProvider: { get: () => 'http' } } }
       : undefined,
   })
-  assert.equal(billing.search, 0.005)
+  // Since 2026-11-18 12:00 Beijing the in-turn search is paid as tokens only, so a
+  // Messages search must not add a per-request fee on top of the token cost.
+  assert.equal(billing.search, null)
   assert.equal(billing.fetch, null)
 
   const priced = computeSessionUsage([
     call(1, 's1', 'web_search', start + 1_000),
     result(1, 's1', start + 2_000, { sources: [{ url: 'https://example.com' }] }),
   ], new Map(), new Map(), null, billing)
-  assert.equal(priced.totals.webSearchCalls, 1)
-  assert.equal(priced.totals.webSearchBilled, 1)
-  assert.equal(priced.totals.toolCost, 0.005)
+  assert.equal(priced.totals.webSearchCalls, 0)
+  assert.equal(priced.totals.webSearchBilled, 0)
+  assert.equal(priced.totals.toolCost, 0)
 
   // A search that returns no sources is not billed.
   const empty = computeSessionUsage([
@@ -572,8 +574,8 @@ test('detects only DeepSeek web providers as billable', () => {
       ? { config: { searchProvider: { get: () => search }, fetchProvider: { get: () => fetch } } }
       : undefined,
   })
-  // The Messages search provider bills its server-side search per term too.
-  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, 0.005)
+  // The Messages search provider runs in-turn and is paid as tokens, not per call.
+  assert.equal(webToolBilling(ctx('deepseek-official', 'http')).search, null)
   assert.equal(webToolBilling(ctx('deepseek-official', 'http')).fetch, null)
   assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).search, 0.005)
   assert.equal(webToolBilling(ctx('deepseek-search-api', 'deepseek-fetch-api')).fetch, 0.005)

@@ -30,14 +30,12 @@ const KEY_SEPARATOR = '\u0000'
 // tool/result per invocation, so the fee can be folded from the session log.
 const DEEPSEEK_WEB_TOOL_START = Date.parse('2026-11-01T00:00:00+08:00')
 const DEEPSEEK_WEB_TOOL_PRICE = 0.005
-// Since 2026-11-01 the server-side search is billed separately from tokens:
-// ¥0.005 per successful query term, both for the standalone Search API and for
-// the search made inside a model turn. DSH's `deepseek-official` provider runs
-// Anthropic's `web_search_20250305` and the host drops `usage.server_tool_use`,
-// so one successful `web_search` tool call can only be counted as one term — a
-// floor that under-reports multi-term calls 2–3x. The tokens of the auxiliary
-// search request never reach the session log, so they stay invisible here.
-const DEEPSEEK_SEARCH_PROVIDERS = new Set(['deepseek-search-api', 'deepseek-official'])
+// From 2026-11-18 12:00 Beijing time DeepSeek no longer bills the server-side
+// search and fetch that a model turn triggers: their results are appended to the
+// context and paid as model tokens. So `deepseek-official` (which runs Anthropic's
+// `web_search_20250305` in-turn) must not be charged per call; only the standalone
+// Search / Fetch APIs below are billed per successful request.
+const DEEPSEEK_SEARCH_PROVIDERS = new Set(['deepseek-search-api'])
 const DEEPSEEK_FETCH_PROVIDERS = new Set(['deepseek-fetch-api'])
 const DISPLAY_DEFAULTS = Object.freeze({
   showTurnTail: true,
@@ -78,8 +76,9 @@ const DEEPSEEK_PRICES = {
   },
 }
 
-// Chinese statutory holidays (2026). Weekends are always off-peak; these dates
-// are the extra weekday closures that must not be billed at peak rates.
+// Chinese statutory holidays (2026 and 2027). Weekends are always off-peak; these
+// dates are the extra weekday closures that must not be billed at peak rates.
+// 2027 source: 国办发明电〔2026〕10号 (2026-11-05).
 const DEEPSEEK_HOLIDAYS = new Set([
   '2026-01-01', '2026-01-02', '2026-01-03',
   '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19',
@@ -90,6 +89,15 @@ const DEEPSEEK_HOLIDAYS = new Set([
   '2026-09-25', '2026-09-26', '2026-09-27',
   '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04',
   '2026-10-05', '2026-10-06', '2026-10-07',
+  '2027-01-01', '2027-01-02', '2027-01-03',
+  '2027-02-05', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09',
+  '2027-02-10', '2027-02-11', '2027-02-12', '2027-02-13',
+  '2027-04-03', '2027-04-04', '2027-04-05',
+  '2027-05-01', '2027-05-02', '2027-05-03', '2027-05-04', '2027-05-05',
+  '2027-06-09',
+  '2027-09-15',
+  '2027-10-01', '2027-10-02', '2027-10-03', '2027-10-04',
+  '2027-10-05', '2027-10-06', '2027-10-07',
 ])
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',

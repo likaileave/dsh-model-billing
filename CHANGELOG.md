@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.5] - 2026-11-23
+
+### 变更
+
+- 模型回合内的联网搜索（`deepseek-official`）不再计按次费：DeepSeek 自 2026-11-18 12:00 北京时间起把回合内的服务端搜索并入上下文按 token 计费；独立的 `deepseek-search-api` / `deepseek-fetch-api` 仍按 ¥5 / 1,000 次成功请求计次，费用明细里的搜索、抓取次数只统计这两者。
+- 内置峰谷价表纳入 2027 年法定节假日：`DEEPSEEK_HOLIDAYS` 现在覆盖 2026–2027 年，2027 年的元旦、春节、清明、劳动节、端午、中秋、国庆都按空闲价计算。
+
+### Changed
+
+- In-turn web search (`deepseek-official`) no longer adds a per-request fee: since 2026-11-18 12:00 Beijing time DeepSeek bills the server-side search of a model turn as model tokens. The standalone `deepseek-search-api` / `deepseek-fetch-api` providers are still charged at ¥5 per 1,000 successful requests, and the detail panel counts only those.
+- The built-in peak/off-peak table now covers 2027 as well as 2026: `DEEPSEEK_HOLIDAYS` includes the 2027 New Year, Spring Festival, Qingming, Labour Day, Dragon Boat, Mid-Autumn and National Day closures, all priced off-peak.
+
 ## [0.3.4] - 2026-11-15
 
 ### 修复

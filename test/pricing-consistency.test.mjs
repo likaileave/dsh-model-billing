@@ -145,6 +145,11 @@ test('weekends and holidays fall back to off-peak', () => {
   // 2026-10-25 is a Sunday; 2026-10-01 is a statutory holiday.
   assert.equal(deepseekPeakAt(Date.parse('2026-10-25T02:00:00Z')), false)
   assert.equal(deepseekPeakAt(Date.parse('2026-10-01T02:00:00Z')), false)
+  // 2027 table: 2027-02-08 is a Monday inside the Spring Festival closure, so it
+  // must price as off-peak; 2027-03-01 is an ordinary Monday, so it is peak.
+  assert.equal(deepseekPeakAt(Date.parse('2027-02-08T02:00:00Z')), false)
+  assert.equal(deepseekPeakAt(Date.parse('2027-03-01T02:00:00Z')), true)
+  assert.equal(deepseekPeakAt(Date.parse('2027-10-04T02:00:00Z')), false)
   const offPeak = resolveRoutePricing('deepseek-account', 'deepseek-flash', undefined, Date.parse('2026-10-25T02:00:00Z'))
   assert.equal(offPeak.prices.cacheMiss, 1)
 })
