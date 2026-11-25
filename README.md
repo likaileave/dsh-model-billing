@@ -33,7 +33,8 @@
 - **DeepSeek 官方价内置**：`deepseek-flash`（含 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp` 等同价别名）和 `deepseek-v4-pro` 默认使用 DeepSeek 官网的峰谷价，并在设置页标明“官方价”；填入完整的三档自定义价即可覆盖官方价，标为“自定义”。
 - **逐轮费用与使用模型**：每轮结束后在轮尾显示这一轮使用的模型，以及该轮费用和缓存命中率。
 - **可配置轮尾**：在设置中总开关轮尾显示，并可分别开关使用模型、模型提供商、费用、token、缓存命中率、文字标签，调整字号、间距和字重；也可以关闭选择器接管，恢复 DSH 内置模型选择器。输入框下方的费用估算另有独立开关。
-- **本会话费用**：输入框下方显示本会话累计估算、最近一轮费用和缓存命中率；展开后可查看按轮次和按模型的明细。
+- **选择器里的团队协作开关**：接管选择器时，推理强度下方保留 DSH 的「启用智能体团队协作」开关，行为与内置开关一致（子代理会话隐藏、关闭前弹同一份警告确认、失败提示同文），旁边的 ⓘ 显示原生说明。
+- **本会话费用**：输入框下方显示本会话累计估算、最近一轮费用和缓存命中率；展开后可查看按轮次和按模型的明细。模型在回合内自行联网搜索的次数单独列出——DeepSeek 把它并入上下文按 token 计费，日志里没有该辅助请求的用量，所以只计次数、不计金额。
 - **DeepSeek Search/Fetch 按次费**：只对 DeepSeek 独立的 Search / Fetch API（`deepseek-search-api` / `deepseek-fetch-api`）按官方 ¥5 / 1,000 次成功请求计入合计，并在费用明细里单独列出搜索、抓取的计费次数。模型回合内的联网搜索（`deepseek-official`）自 2026-11-18 12:00 北京时间起不再单独收费，结果并入上下文按 token 计费，因此这里不重复收。
 - **历史价格与未定价路由**：设置页的“历史价格”区可以为已移出配置的模型补价、改价或删除，不必把模型加回列表；从模型列表删除模型不会删除它的价格，历史调用仍按保存的价格计算，查不到名称时显示原始模型 id。缺价时显示统一提示，可在设置里关闭这条提示。
 - **DeepSeek 也计入金额**：每条 usage 按事件发生时的北京时间自动选择高峰或空闲价，与第三方模型一起进入统计。
@@ -165,7 +166,8 @@ node --test test/*.test.mjs
 - **Built-in official DeepSeek pricing** for `deepseek-flash` (and the same-rate aliases `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp`) and `deepseek-v4-pro`, selected per usage event between peak and off-peak Beijing time. A complete set of custom prices overrides the table and is labelled "Custom".
 - **Per-turn model and amount** at the end of each turn, together with the turn's cache-hit rate.
 - **Configurable turn tail**: a master switch for the turn tail, plus individual toggles for models, provider names, cost, tokens, cache-hit rate, and text labels; adjust font size, spacing, and weight; or disable the picker takeover to restore the built-in DSH picker. The composer cost estimate has its own switch.
-- **Session summary** below the composer plus a detail panel grouped by turn and by model.
+- **Team switch in the picker**: while the plugin owns the picker, DSH's "Enable agent teamwork" switch stays below the reasoning effort rows. It behaves like the built-in switch — hidden for subagent sessions, the same disable warning, the same failure message — and its ⓘ shows the native description on hover or focus.
+- **Session summary** below the composer plus a detail panel grouped by turn and by model. The number of in-turn web searches is listed separately: DeepSeek bills them as model tokens and the log carries no usage for that auxiliary request, so they are counted but not priced.
 - **DeepSeek Search/Fetch per-request fees**: only DeepSeek's standalone Search / Fetch APIs (`deepseek-search-api` / `deepseek-fetch-api`) are billed at the official ¥5 per 1,000 successful requests, with search and fetch billed counts shown separately in the detail panel. In-turn web search (`deepseek-official`) has been billed as model tokens instead since 2026-11-18 12:00 Beijing time, so it is not charged per request here.
 - **Historical prices and unpriced routes**: the "Historical prices" section in Settings lets you add, edit, or remove prices for models no longer in your order without re-adding them. Removing a model from the list keeps its price, so historical calls still bill correctly; when the name is unknown, the raw model id is shown. Unpriced calls share one notice that can be switched off.
 - **DeepSeek is billed too**, using the same three-price formula and the event's timestamp.

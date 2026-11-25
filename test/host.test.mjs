@@ -582,3 +582,38 @@ test('detects only DeepSeek web providers as billable', () => {
   assert.equal(webToolBilling(ctx('ddg', 'fs-quality-fetch')).search, null)
   assert.equal(webToolBilling({}).search, null)
 })
+
+test('counts in-turn searches without inventing a price for them', () => {
+  const usage = { inputTokens: 1_000_000, outputTokens: 0 }
+  // 2026-10-26T02:00:00Z is Beijing 10:00 Monday — peak, cacheMiss 2 for deepseek-flash.
+  const peak = Date.parse('2026-10-26T02:00:00Z')
+  const request = (turn, seq, time) => ({
+    type: 'web/deepseek-search-llm-request',
+    seq,
+    time,
+    data: { endpoint: '/chat/completions', apiVersion: 'v1', body: { model: 'deepseek-flash' } },
+  })
+  // The per-turn count rides on the turn that is open when the request lands, so the
+  // fixture has to open turns explicitly instead of relying on assistant messages.
+  const start = (turn, seq, time) => ({ type: 'turn/start', seq, time, data: { turn } })
+  const priced = computeSessionUsage([
+    start(1, 1, peak),
+    assistant(1, 1, 2, 'deepseek-account', 'deepseek-flash', usage, peak),
+    request(1, 3, peak + 1_000),
+    request(1, 4, peak + 2_000),
+    start(2, 5, peak),
+    assistant(2, 1, 6, 'deepseek-account', 'deepseek-flash', usage, peak),
+  ], new Map(), new Map(), null, { search: null, fetch: null, start: 0 })
+
+  assert.equal(priced.totals.inTurnSearches, 2)
+  // The auxiliary request carries no usage, so it must not move money or the tool counters.
+  assert.equal(priced.totals.toolCost, 0)
+  assert.equal(priced.totals.webSearchCalls, 0)
+  assert.equal(priced.totals.cost, 4)
+  assert.deepEqual(priced.turns.map((turn) => turn.inTurnSearches), [2, 0])
+
+  // A search outside any turn still shows up in the session total.
+  const outside = computeSessionUsage([request(9, 2, peak + 5_000)], new Map())
+  assert.equal(outside.totals.inTurnSearches, 1)
+  assert.equal(outside.turns.length, 0)
+})

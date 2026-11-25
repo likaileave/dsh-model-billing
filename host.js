@@ -543,6 +543,9 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
   let latestTime = 0
   let currentTurn = null
   let pendingPreview = null
+  // DeepSeek's in-turn (Messages) search records only the auxiliary request, never
+  // its usage, so the plugin can count those searches but cannot price them.
+  let inTurnSearches = 0
 
   const ensureTurn = (turn, time) => {
     let entry = turns.get(turn)
@@ -556,6 +559,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
         attempts: [],
         models: new Map(),
         toolCharges: [],
+        inTurnSearches: 0,
       }
       turns.set(turn, entry)
     }
@@ -608,6 +612,15 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
   }
 
   for (const event of events) {
+    if (event?.type === 'web/deepseek-search-llm-request') {
+      if (currentTurn !== null) {
+        const entry = ensureTurn(currentTurn, event.time)
+        entry.inTurnSearches += 1
+        entry.endTime = Math.max(entry.endTime, Number(event.time) || 0)
+      }
+      inTurnSearches += 1
+      continue
+    }
     if (event?.type === 'turn/start') {
       const turn = event.data?.turn
       if (Number.isSafeInteger(turn)) {
@@ -699,6 +712,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     webSearchBilled: 0,
     webFetchCalls: 0,
     webFetchBilled: 0,
+    inTurnSearches: 0,
     promptTokens: 0,
     uncachedInputTokens: 0,
     cacheReadTokens: 0,
@@ -731,6 +745,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
       webSearchBilled: 0,
       webFetchCalls: 0,
       webFetchBilled: 0,
+      inTurnSearches: entry.inTurnSearches,
       promptTokens: 0,
       uncachedInputTokens: 0,
       cacheReadTokens: 0,
@@ -854,6 +869,7 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
     totals.webSearchBilled += row.webSearchBilled
     totals.webFetchCalls += row.webFetchCalls
     totals.webFetchBilled += row.webFetchBilled
+    totals.inTurnSearches += row.inTurnSearches
     totals.promptTokens += row.promptTokens
     totals.uncachedInputTokens += row.uncachedInputTokens
     totals.cacheReadTokens += row.cacheReadTokens
@@ -870,6 +886,8 @@ function computeSessionUsage(events, pricingByKey = new Map(), nameByKey = new M
   }
 
   totals.cacheHit = totals.cacheReported && totals.promptTokens > 0 ? totals.cacheReadTokens / totals.promptTokens : null
+  // Authoritative even for turns that contributed no row (e.g. a search before any usage).
+  totals.inTurnSearches = inTurnSearches
   totals.partial = totals.unpricedAttempts > 0 || turnRows.some((row) => row.partial === true)
   totals.partialCurrent = totals.unpricedCurrentAttempts > 0
   totals.costKnown = totals.attempts > 0 && totals.unpricedAttempts === 0

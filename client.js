@@ -96,6 +96,8 @@ window.__ModuleLoader__.load({
         remove: '删除',
         estimateNote: '金额由会话日志中的 token 用量和缓存命中估算；DeepSeek 按事件时间使用内置峰谷价，实际账单以提供方为准。',
         webToolNote: '含 DeepSeek Search/Fetch 按次费 {amount}（搜索 {searchBilled}/{searchCalls} 次，抓取 {fetchBilled}/{fetchCalls} 次；只统计独立的 Search/Fetch API，模型回合内的联网搜索已随 token 计费，不在这里重复收）。',
+        inTurnSearchNote: '模型回合内联网搜索 {count} 次：DeepSeek 按模型 token 计费，会话日志里只有该辅助请求、没有它的用量，所以这里只计次数、不计金额。',
+        inTurnSearchTip: '本回合有 {count} 次模型回合内联网搜索（按 token 计费，未单独计价）',
         listSep: '、',
         turnCost: '费用',
         turnTokens: '本轮 Token',
@@ -134,6 +136,15 @@ window.__ModuleLoader__.load({
         noMatch: '没有匹配的模型',
         pickerEmpty: '暂无可用模型',
         reasoningEffort: '推理强度',
+        teamLabel: '启用智能体团队协作',
+        teamInfoLabel: '关于智能体团队协作',
+        teamHint: '通过共享任务板协调多个智能体的分工与进度，复杂任务表现更佳，token 开销也相应更高。',
+        teamOffTitle: '确认停用智能体团队协作？',
+        teamOffDesc: '对话过程中停用智能体团队协作，将停止共享任务工具和团队协调指令。',
+        teamOffWarn: '停用后可能影响缓存复用、增加后续 token 用量与开销，并影响当前任务的协作效果。',
+        teamOffConfirmAction: '确认停用',
+        teamCancel: '取消',
+        teamFailed: '无法确认智能体团队协作设置已保存，请重试：{message}',
         providerDefault: '提供方默认',
         switching: '切换中…',
         pickerRetry: '重新加载',
@@ -216,6 +227,8 @@ window.__ModuleLoader__.load({
         remove: 'Remove',
         estimateNote: 'Amounts are estimated from token usage and cache hits in the session log; DeepSeek uses built-in peak/off-peak prices at the event time, and the provider bill is authoritative.',
         webToolNote: 'Includes DeepSeek Search/Fetch per-request fees {amount} (search {searchBilled}/{searchCalls}, fetch {fetchBilled}/{fetchCalls}; only the standalone Search/Fetch APIs count — in-turn web search is already paid as tokens and is not charged again).',
+        inTurnSearchNote: 'In-turn web search ran {count} time(s): DeepSeek bills those as model tokens, and the session log records only the auxiliary request without its usage, so they add a count but no amount.',
+        inTurnSearchTip: 'This turn made {count} in-turn web search(es), billed as model tokens and not priced separately',
         listSep: ', ',
         turnCost: 'Cost',
         turnTokens: 'Turn tokens',
@@ -254,6 +267,15 @@ window.__ModuleLoader__.load({
         noMatch: 'No matching model',
         pickerEmpty: 'No model available',
         reasoningEffort: 'Reasoning effort',
+        teamLabel: 'Enable agent teamwork',
+        teamInfoLabel: 'About agent teamwork',
+        teamHint: 'Coordinate work and progress across agents with a shared task board for better results on complex tasks, with correspondingly higher token costs.',
+        teamOffTitle: 'Disable agent teamwork?',
+        teamOffDesc: 'Disabling agent teamwork during a conversation stops the use of shared task tools and team coordination instructions.',
+        teamOffWarn: 'Disabling it may affect cache reuse, increase subsequent token usage and costs, and affect collaboration on the current task.',
+        teamOffConfirmAction: 'Disable',
+        teamCancel: 'Cancel',
+        teamFailed: 'Could not confirm the agent teamwork setting was saved. Try again: {message}',
         providerDefault: 'Provider default',
         switching: 'Switching…',
         pickerRetry: 'Reload',
@@ -293,6 +315,28 @@ window.__ModuleLoader__.load({
         subscribeModelDirectories,
         () => modelDirectoryRevision,
         () => 0,
+      )
+    }
+
+    // The Agent Teams remote arrives with the client plugin that owns it. Keep it
+    // in a tiny store so the picker re-renders when the service shows up late.
+    let agentTeamsRemote = null
+    const agentTeamsListeners = new Set()
+
+    function publishAgentTeams(next) {
+      if (next === agentTeamsRemote) return
+      agentTeamsRemote = next ?? null
+      for (const listener of [...agentTeamsListeners]) listener()
+    }
+
+    function useAgentTeamsRemote() {
+      return useSyncExternalStore(
+        (listener) => {
+          agentTeamsListeners.add(listener)
+          return () => agentTeamsListeners.delete(listener)
+        },
+        () => agentTeamsRemote,
+        () => null,
       )
     }
 
@@ -791,6 +835,19 @@ window.__ModuleLoader__.load({
       .mb-picker-divider { border-top: 1px solid var(--dsw-alias-border-l1); margin: 3px 0; }
       .mb-picker-efforts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px 4px 4px; }
       .mb-picker-efforts-label { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); font-size: 11px; margin-right: 2px; }
+      .mb-team-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 6px 5px; }
+      .mb-team-row .mb-team-label { display: inline-flex; align-items: center; gap: 4px; color: var(--dsw-alias-label-primary, #e8e8ea); font-size: 12px; line-height: 1.35; cursor: default; }
+      .mb-team-row .mb-team-switch { flex: none; }
+      .mb-team-info-wrap { position: relative; display: inline-flex; align-items: center; }
+      .mb-team-info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--dsw-alias-label-caption, var(--dsw-alias-label-secondary, #a5a5ad)); cursor: pointer; }
+      .mb-team-info:hover { color: var(--dsw-alias-label-primary, #e8e8ea); background: var(--dsw-alias-bg-layer-3, #2e2e33); }
+      .mb-team-info:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #4d6bfe); outline-offset: 1px; }
+      .mb-team-tip { position: fixed; z-index: 1200; transform: translate(-100%, -100%); width: max-content; box-sizing: border-box; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2, #3a3a3d); background: var(--dsw-alias-bg-layer-3, #2e2e33); color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; line-height: 1.5; box-shadow: 0 8px 22px rgba(0, 0, 0, .4); pointer-events: none; }
+      .mb-team-confirm { display: flex; flex-direction: column; gap: 7px; padding: 4px 6px 6px; }
+      .mb-team-confirm .mb-team-confirm-title { color: var(--dsw-alias-label-primary, #e8e8ea); font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+      .mb-team-confirm .mb-team-confirm-text { color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; line-height: 1.45; }
+      .mb-team-confirm .mb-team-confirm-warn { color: var(--dsw-alias-label-caption, var(--dsw-alias-label-secondary, #a5a5ad)); font-size: 11.5px; line-height: 1.45; }
+      .mb-team-confirm .mb-team-confirm-actions { display: flex; justify-content: flex-end; gap: 6px; }
       .mb-picker-chip { appearance: none; border: 0; background: 0 0; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11px; height: 24px; padding: 0 7px; border-radius: var(--dsw-radius-sm); cursor: pointer; }
       .mb-picker-chip:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
       .mb-picker-chip[aria-pressed="true"] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
@@ -1517,11 +1574,12 @@ window.__ModuleLoader__.load({
         const modelText = modelNames.length === 0
           ? '—'
           : modelNames.length === 1 ? modelNames[0] : `${modelNames[0]} +${modelNames.length - 1}`
+        const searchTip = turn.inTurnSearches > 0 ? translate('inTurnSearchTip', { count: turn.inTurnSearches }) : null
         return h('tr', { key: turn.turn },
           h('td', null, `#${turn.turn}`),
           h('td', { className: 'mb-turn-preview', title: turn.preview }, turn.preview || '—'),
           h('td', null, `${timeText(turn.startTime)}–${timeText(turn.endTime)}`),
-          h('td', { className: 'mb-turn-model', title: modelNames.join(' / ') }, modelText),
+          h('td', { className: 'mb-turn-model', title: [modelNames.join(' / '), searchTip].filter(Boolean).join(' · ') }, modelText),
           h('td', { className: 'num' }, costText),
           h('td', { className: 'num' }, `${formatTokens(turn.promptTokens)} / ${formatTokens(turn.outputTokens)}`),
           h('td', { className: 'num' }, formatPercent(turn.cacheHit)))
@@ -1650,6 +1708,9 @@ window.__ModuleLoader__.load({
             fetchBilled: totals.webFetchBilled ?? 0,
             fetchCalls: totals.webFetchCalls ?? 0,
           }))
+          : null,
+        totals.inTurnSearches > 0
+          ? h('p', { className: 'mb-panel-note' }, translate('inTurnSearchNote', { count: totals.inTurnSearches }))
           : null,
         totals.partial && display.showUnpricedNotice
           ? h('p', { className: 'mb-warn' }, translate('partialNote'))
@@ -1784,10 +1845,26 @@ window.__ModuleLoader__.load({
 
     const MODEL_KEY_SEPARATOR = '\u0000'
 
-    function OrderedModelPicker({ locked, sessionId, useProjection }) {
+    function OrderedModelPicker({ locked, sessionId, useProjection, useSession, useSessions }) {
       const translate = useT()
       const catalogSnap = useCatalog()
       const selectionProjection = useProjection('modelSelection')
+      const teamProjection = typeof useProjection === 'function' ? useProjection('agentTeam') : undefined
+      // The native toggle hides itself in subagent Sessions by two independent checks;
+      // mirror both so the plugin switch can never appear where the native one cannot.
+      const addressedChild = typeof useSession === 'function'
+        ? useSession((snapshot) => snapshot.subagent !== null)
+        : false
+      const listedChild = typeof useSessions === 'function'
+        ? useSessions((state) => state.byId?.[sessionId]?.origin === 'subagent')
+        : false
+      const agentTeams = useAgentTeamsRemote()
+      const [teamPending, setTeamPending] = useState(false)
+      const [teamConfirm, setTeamConfirm] = useState(false)
+      const [teamTip, setTeamTip] = useState(false)
+      const [teamTipPos, setTeamTipPos] = useState(null)
+      const teamTipTimer = useRef(null)
+      const teamInfoRef = useRef(null)
       const directoryRevision = useModelDirectoriesRevision()
       const [directoryTick, setDirectoryTick] = useState(0)
       const directory = useMemo(() => {
@@ -1848,17 +1925,29 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (!open) {
           setQuery('')
+          setTeamConfirm(false)
+          // A pending hover timer must not resurrect the tooltip over a closed menu.
+          if (teamTipTimer.current !== null) {
+            clearTimeout(teamTipTimer.current)
+            teamTipTimer.current = null
+          }
+          setTeamTip(false)
           return undefined
         }
         const closeOnEscape = (event) => {
           if (event.key !== 'Escape') return
           event.preventDefault()
+          // The confirmation sits inside this menu, so Escape backs out of it first.
+          if (teamConfirm) {
+            setTeamConfirm(false)
+            return
+          }
           setOpen(false)
           queueMicrotask(() => triggerRef.current?.focus())
         }
         document.addEventListener('keydown', closeOnEscape)
         return () => document.removeEventListener('keydown', closeOnEscape)
-      }, [open])
+      }, [open, teamConfirm])
 
       useEffect(() => {
         if (locked && open) setOpen(false)
@@ -2065,11 +2154,94 @@ window.__ModuleLoader__.load({
           return
         }
         setToast(null)
+        setTeamConfirm(false)
         // Open the cursor on the row the user is already using, when there is one.
         const selectedAt = filtered.findIndex((entry) => entry.group.id === current?.provider && entry.model.id === current?.model)
         setActiveIndex(selectedAt < 0 ? 0 : selectedAt)
         setOpen(true)
         if (directory !== null) directory.load().catch(() => {})
+      }
+
+      // Agent Teams lives on the root Session projection; subagent Sessions have none.
+      const showTeamRow = agentTeams !== null && teamProjection !== undefined && sessionId !== undefined
+        && !addressedChild && !listedChild
+      const teamEnabled = teamProjection?.enabled === true
+      const teamLocked = locked === true || selectionProjection === undefined
+      // The native switch answers a hover with the shared description tooltip, so the
+      // plugin row does the same instead of relying on a bare title attribute. The tip
+      // is portalled to the body: the menu clips its children, the tip must escape it.
+      const placeTeamTip = () => {
+        const rect = teamInfoRef.current?.getBoundingClientRect()
+        if (rect === undefined) {
+          setTeamTipPos(null)
+          return
+        }
+        setTeamTipPos({
+          left: rect.right,
+          top: rect.top - 7,
+          maxWidth: Math.max(160, Math.min(300, rect.right - 8)),
+        })
+      }
+      const showTeamTip = () => {
+        if (teamTipTimer.current !== null) clearTimeout(teamTipTimer.current)
+        teamTipTimer.current = setTimeout(() => {
+          teamTipTimer.current = null
+          placeTeamTip()
+          setTeamTip(true)
+        }, 300)
+      }
+      const hideTeamTip = () => {
+        if (teamTipTimer.current !== null) {
+          clearTimeout(teamTipTimer.current)
+          teamTipTimer.current = null
+        }
+        setTeamTip(false)
+      }
+      // The native info button also opens the tooltip on click, so a pointer user can
+      // read it without holding still over an 11px target.
+      const onTeamInfoClick = () => {
+        if (teamTipTimer.current !== null) {
+          clearTimeout(teamTipTimer.current)
+          teamTipTimer.current = null
+        }
+        if (teamTip) {
+          setTeamTip(false)
+          return
+        }
+        placeTeamTip()
+        setTeamTip(true)
+      }
+      const applyTeamMode = (enabled) => {
+        if (agentTeams === null || sessionId === undefined || teamPending) return
+        setTeamPending(true)
+        void Promise.resolve(agentTeams.setEnabled(sessionId, enabled)).then((result) => {
+          setTeamConfirm(false)
+          // The native menu is gone by the time its confirmation is answered, so the
+          // plugin closes the menu once a disable has actually been saved.
+          if (enabled === false) setOpen(false)
+          if (result !== undefined && result !== null && result.ok === false) {
+            setToast(translate('teamFailed', { message: result.error?.message ?? '' }))
+          }
+        }, (error) => {
+          setTeamConfirm(false)
+          setToast(translate('teamFailed', { message: error?.message ?? String(error) }))
+        }).finally(() => {
+          setTeamPending(false)
+        })
+      }
+      const onTeamToggle = () => {
+        if (teamPending || teamLocked) return
+        if (!teamEnabled) {
+          applyTeamMode(true)
+          return
+        }
+        // The native menu asks before it drops teamwork once a model already ran
+        // in this Session; mirror that so nothing is torn down by a stray click.
+        if (selectionProjection !== undefined && selectionProjection !== null && selectionProjection.lastUsed !== null) {
+          setTeamConfirm(true)
+          return
+        }
+        applyTeamMode(false)
       }
 
       const menuStyle = menuPos === null
@@ -2207,6 +2379,74 @@ window.__ModuleLoader__.load({
               disabled: busy,
               onClick: () => chooseEffort(choice.effort),
             }, choice.label)))),
+        showTeamRow ? h(Fragment, null,
+          h('div', { className: 'mb-picker-divider' }),
+          teamConfirm
+            ? h('div', { className: 'mb-team-confirm' },
+              h('span', { className: 'mb-team-confirm-title' }, translate('teamOffTitle')),
+              h('span', { className: 'mb-team-confirm-text' }, translate('teamOffDesc')),
+              h('span', { className: 'mb-team-confirm-warn' }, translate('teamOffWarn')),
+              h('div', { className: 'mb-team-confirm-actions' },
+                h('button', {
+                  type: 'button',
+                  className: 'mb-btn',
+                  disabled: teamPending,
+                  onClick: () => setTeamConfirm(false),
+                }, translate('teamCancel')),
+                h('button', {
+                  type: 'button',
+                  className: 'mb-btn mb-btn-primary',
+                  disabled: teamPending,
+                  onClick: () => applyTeamMode(false),
+                }, translate('teamOffConfirmAction'))))
+            : h('div', { className: 'mb-team-row' },
+              h('span', { className: 'mb-team-label' },
+                h('span', null, translate('teamLabel')),
+                h('span', { className: 'mb-team-info-wrap' },
+                  h('button', {
+                    ref: teamInfoRef,
+                    type: 'button',
+                    className: 'mb-team-info',
+                    'aria-label': translate('teamInfoLabel'),
+                    'aria-expanded': teamTip ? 'true' : 'false',
+                    onMouseEnter: showTeamTip,
+                    onMouseLeave: hideTeamTip,
+                    onFocus: showTeamTip,
+                    onBlur: hideTeamTip,
+                    onClick: onTeamInfoClick,
+                  }, h('svg', {
+                    width: 11,
+                    height: 11,
+                    viewBox: '0 0 16 16',
+                    'aria-hidden': 'true',
+                  },
+                    h('circle', {
+                      cx: 8, cy: 8, r: 6.5, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4,
+                    }),
+                    h('path', {
+                      d: 'M8 7.1v4.1', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round',
+                    }),
+                    h('circle', { cx: 8, cy: 4.7, r: 0.95, fill: 'currentColor' }))),
+                  teamTip && teamTipPos !== null
+                    ? ReactDOM.createPortal(h('div', {
+                      className: 'mb-team-tip',
+                      role: 'tooltip',
+                      style: {
+                        left: `${teamTipPos.left}px`,
+                        top: `${teamTipPos.top}px`,
+                        maxWidth: `${teamTipPos.maxWidth}px`,
+                      },
+                    }, translate('teamHint')), document.body)
+                    : null)),
+              h('button', {
+                type: 'button',
+                role: 'switch',
+                className: 'mb-switch mb-team-switch',
+                'aria-checked': teamEnabled ? 'true' : 'false',
+                'aria-label': translate('teamLabel'),
+                disabled: teamPending || busy || teamLocked,
+                onClick: onTeamToggle,
+              }))) : null,
         busy ? h('div', { className: 'mb-picker-status' }, translate('switching')) : null,
         toast === null ? null : h('div', { className: 'mb-picker-toast', role: 'status', 'aria-live': 'polite' }, toast),
         state?.status === 'error'
@@ -2284,6 +2524,13 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         localeService = ctx.get('locale')
         publishModelDirectories(ctx.get('modelDirectories'))
+        // Agent Teams is optional: without its remote the teamwork row stays hidden.
+        ctx.inject(['remote', 'remote.agentTeams'], (scope) => {
+          publishAgentTeams(scope.remote.agentTeams)
+          return () => {
+            publishAgentTeams(null)
+          }
+        })
         ctx.inject(['modelDirectories'], (scope) => {
           publishModelDirectories(scope.modelDirectories)
           let seat = null
