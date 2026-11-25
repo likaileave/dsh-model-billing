@@ -4,12 +4,12 @@
 
 ### 新增
 
-- 模型选择器新增「启用智能体团队协作」开关：位置在推理强度下方，行为与 DSH 内置开关一致——子代理会话不显示，关闭时先弹出同一份警告确认，写入失败时沿用原生提示文案；开关后面的 ⓘ 悬停或用键盘聚焦即显示原生说明，点击也能开关说明。
+- 模型选择器新增「启用智能体团队协作」开关：位置在推理强度下方，行为与 DSH 内置开关一致——子代理会话不显示，关闭时先弹出同一份警告确认，写入失败时沿用原生提示文案。
 - 费用明细新增「回合内联网搜索」次数：模型在回合内自行联网搜索时逐次计数。这类搜索由 DeepSeek 并入上下文按 token 计费，会话日志里只有辅助请求、没有它的用量，因此只计次数、不计金额。
 
 ### Added
 
-- The model picker now carries the "Enable agent teamwork" switch below the reasoning effort rows. It behaves like the built-in switch: hidden for subagent sessions, the same disable warning before turning it off, and the native failure message when the write is rejected. The ⓘ next to it shows the native description on hover or keyboard focus, and clicking toggles it as well.
+- The model picker now carries the "Enable agent teamwork" switch below the reasoning effort rows. It behaves like the built-in switch: hidden for subagent sessions, the same disable warning before turning it off, and the native failure message when the write is rejected.
 - The cost detail now counts in-turn web searches: each search the model runs inside a turn is counted. DeepSeek bills those as model tokens, and the session log holds the auxiliary request without its usage, so they are counted but not priced.
 
 ## [0.3.5] - 2026-11-23
