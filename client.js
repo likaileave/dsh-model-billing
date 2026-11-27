@@ -32,11 +32,21 @@ window.__ModuleLoader__.load({
         saving: '保存中…',
         saved: '已保存',
         unsaved: '有未保存的修改',
-        undo: '撤销修改',
+        autoSaveNote: '配置修改后会自动保存',
         orderHint: '用 ↑ / ↓ 调整顺序；顺序直接决定对话框右下角模型选择器中的排列，也用于费用估算。',
         noModels: '当前没有可用的已配置模型。',
         up: '上移',
         down: '下移',
+        position: '位次',
+        positionHint: '直接输入目标位次，回车或离开输入框即移动。',
+        positionModeLabel: '插入方式',
+        positionModeAfter: '排在填的位次之后',
+        positionModeBefore: '排在填的位次',
+        positionModeNote: '填 5 选「排在填的位次」→ 成为第 5 位；选「排在填的位次之后」→ 成为第 6 位。与它原来在第几位无关。',
+        hide: '在选择器里隐藏',
+        show: '在选择器里显示',
+        hiddenTag: '已隐藏',
+        hiddenHint: '隐藏只影响模型选择器，价格与费用估算照旧。',
         cacheHitPrice: '输入 · 缓存命中',
         cacheMissPrice: '输入 · 缓存未命中',
         outputPrice: '输出',
@@ -87,6 +97,7 @@ window.__ModuleLoader__.load({
         priceSaved: '价格已保存',
         archiveSection: '历史价格',
         archiveHint: '已移除模型的调用仍按这里保存的价格计价，不需要把它们加回模型列表。',
+        clearArchive: '全部清空',
         archiveEmpty: '暂无历史价格',
         addArchive: '添加历史价格',
         archiveProvider: '提供商',
@@ -105,7 +116,7 @@ window.__ModuleLoader__.load({
         displayFields: '显示项目',
         displayLook: '外观',
         modelsSection: '模型顺序与单价',
-        modelsHint: '↑ / ↓ 决定选择器里的排列；单价按每百万 tokens 填写，三项留空即恢复官方价。',
+        modelsHint: '每行最左边的数字可以直接改：填入目标位次后按回车即移动（↑ / ↓ 也能微调）；单价按每百万 tokens 填写，三项留空即恢复官方价。',
         displayTurnTail: '启用轮尾显示',
         displayDock: '显示输入框下方费用估算',
         dockSection: '输入框下方费用估算',
@@ -163,11 +174,21 @@ window.__ModuleLoader__.load({
         saving: 'Saving…',
         saved: 'Saved',
         unsaved: 'Unsaved changes',
-        undo: 'Discard changes',
+        autoSaveNote: 'Changes are saved automatically',
         orderHint: 'Use ↑ / ↓ to reorder. This order is used directly by the model picker at the bottom-right of the composer, and by the cost details.',
         noModels: 'No configured models are available.',
         up: 'Move up',
         down: 'Move down',
+        position: 'Position',
+        positionHint: 'Type a target position; Enter or leaving the field moves the model.',
+        positionModeLabel: 'Insert as',
+        positionModeAfter: 'After that position',
+        positionModeBefore: 'At that position',
+        positionModeNote: 'Enter 5 with "At that position" → it becomes 5th; with "After that position" → 6th. Where it came from does not matter.',
+        hide: 'Hide from the picker',
+        show: 'Show in the picker',
+        hiddenTag: 'Hidden',
+        hiddenHint: 'Hiding only affects the model picker; prices and estimates stay as they are.',
         cacheHitPrice: 'Input · cache hit',
         cacheMissPrice: 'Input · cache miss',
         outputPrice: 'Output',
@@ -218,6 +239,7 @@ window.__ModuleLoader__.load({
         priceSaved: 'Price saved',
         archiveSection: 'Historical prices',
         archiveHint: 'Calls to removed models stay priced from this book; you do not need to add them back to the model list.',
+        clearArchive: 'Clear all',
         archiveEmpty: 'No historical prices yet',
         addArchive: 'Add historical price',
         archiveProvider: 'Provider',
@@ -236,7 +258,7 @@ window.__ModuleLoader__.load({
         displayFields: 'Shown items',
         displayLook: 'Appearance',
         modelsSection: 'Model order and prices',
-        modelsHint: 'The arrows set the picker order; prices are per million tokens, and leaving all three blank restores the official table.',
+        modelsHint: 'The number at the left of each row is editable: type a target position and press Enter (the arrows still nudge); prices are per million tokens, and leaving all three blank restores the official table.',
         displayTurnTail: 'Show the turn tail',
         displayDock: 'Show the composer cost estimate',
         dockSection: 'Composer cost estimate',
@@ -367,6 +389,7 @@ window.__ModuleLoader__.load({
       fontSize: 'normal',
       density: 'comfortable',
       fontWeight: 'normal',
+      positionMode: 'after',
     })
 
     const DISPLAY_STORAGE_KEY = 'dsh-model-billing.display'
@@ -682,6 +705,7 @@ window.__ModuleLoader__.load({
       .mb-mark svg { width: 42px; height: 42px; display: block; }
       .mb-hero h2 { margin: 0 0 4px; font-size: 20px; line-height: 1.25; font-weight: 650; }
       .mb-hero p { margin: 0; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12.5px; }
+      .mb-hero .mb-hero-note { margin-top: 6px; text-align: right; font-size: 11.5px; color: var(--dsw-alias-label-tertiary, #8a8a92); }
       .mb-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
       .mb-bar-count { color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 12px; }
       .mb-muted { color: var(--dsw-alias-label-secondary, #a5a5ad); }
@@ -719,9 +743,19 @@ window.__ModuleLoader__.load({
       .mb-select { max-width: 230px; height: 28px; padding: 0 28px 0 9px; border: 1px solid var(--dsw-alias-border-l2, #3a3a3d); border-radius: 7px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-primary, #e8e8ea); font: inherit; font-size: 12px; cursor: pointer; }
       .mb-select:disabled { cursor: not-allowed; opacity: .5; }
       .mb-model { padding: 12px 0; border-top: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .07)); }
+      .mb-model-hidden { opacity: .62; }
+      .mb-mode-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px 0; }
+      .mb-mode-label { font-size: 12px; color: var(--dsw-alias-label-secondary, #a5a5ad); }
+      .mb-mode-select { flex: none; width: auto; min-width: 168px; }
+      .mb-mode-note { margin: 0; padding: 2px 2px 10px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary, #a5a5ad); }
+      .mb-pos-input { flex: none; width: 40px; height: 22px; margin-top: 1px; padding: 0 2px; border: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .1)); border-radius: 6px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-secondary, #a5a5ad); font: inherit; font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; cursor: text; }
+      .mb-pos-input:hover, .mb-pos-input:focus { border-color: var(--dsw-alias-border-l2, #3a3a3d); background: var(--dsw-alias-bg-layer-1, #202024); color: var(--dsw-alias-label-primary, #e8e8ea); }
+      .mb-pos-input:focus { outline: 2px solid var(--dsw-alias-brand-primary, #3b82f6); outline-offset: 1px; }
+      .mb-switch-sm { width: 30px; height: 18px; }
+      .mb-switch-sm::after { width: 12px; height: 12px; }
+      .mb-switch-sm[aria-checked="true"]::after { transform: translateX(12px); }
       .mb-model:first-child { border-top: 0; }
       .mb-model-head { display: flex; align-items: flex-start; gap: 10px; }
-      .mb-index { flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; background: var(--dsw-alias-bg-layer-2, #26262a); color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11px; font-variant-numeric: tabular-nums; }
       .mb-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.8px; font-weight: 500; }
       .mb-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mb-sub { margin-top: 2px; color: var(--dsw-alias-label-secondary, #a5a5ad); font-size: 11.5px; overflow-wrap: anywhere; }
@@ -911,6 +945,7 @@ window.__ModuleLoader__.load({
         model: model.model,
         name: model.name,
         isDeepSeek: model.isDeepSeek,
+        hidden: model.hidden === true,
         pricing: toDraftPricing(model.pricing),
       }))
     }
@@ -940,8 +975,13 @@ window.__ModuleLoader__.load({
       const [saving, setSaving] = useState(false)
       const [status, setStatus] = useState(null)
 
+      const dirtyRef = useRef(false)
+      dirtyRef.current = dirty
+
       useEffect(() => {
         if (snap.data === null) return
+        // Never overwrite edits made while a save round-trip is in flight.
+        if (dirtyRef.current) return
         setDraft(toDraft(snap.data.models))
         setArchive(toDraftArchive(snap.data.pricingArchive))
         setDisplay(readDisplay(snap.data))
@@ -1000,6 +1040,33 @@ window.__ModuleLoader__.load({
         setStatus(null)
       }
 
+      // The typed number is a slot, not "the model that happens to sit there":
+      // "before" puts the row at that position, "after" one position further down.
+      // The result therefore does not depend on where the row came from.
+      const moveTo = (index, position) => {
+        const current = draft
+        if (current === null || current.length === 0) return
+        const total = current.length
+        const mode = displayValue.positionMode === 'before' ? 'before' : 'after'
+        const slot = Math.max(1, Math.min(total, mode === 'after' ? position + 1 : position))
+        const target = slot - 1
+        if (target === index) return
+        const moved = current[index]
+        setDraft((previous) => {
+          if (previous === null) return previous
+          const next = previous.filter((_, at) => at !== index)
+          if (next.length === 0) return [moved]
+          next.splice(Math.min(target, next.length), 0, moved)
+          return next
+        })
+        setDirty(true)
+        setStatus(null)
+      }
+
+      const toggleHidden = (index) => {
+        update(index, (entry) => ({ ...entry, hidden: entry.hidden !== true }))
+      }
+
       const updateArchive = (index, change) => {
         setArchive((current) => current === null ? current : current.map((entry, at) => at === index ? change(entry) : entry))
         setDirty(true)
@@ -1022,14 +1089,9 @@ window.__ModuleLoader__.load({
         setStatus(null)
       }
 
-      const reset = () => {
-        emitCatalog()
-        if (snap.data !== null) {
-          setDraft(toDraft(snap.data.models))
-          setArchive(toDraftArchive(snap.data.pricingArchive))
-          setDisplay(readDisplay(snap.data))
-        }
-        setDirty(false)
+      const clearArchive = () => {
+        setArchive([])
+        setDirty(true)
         setStatus(null)
       }
 
@@ -1069,7 +1131,8 @@ window.__ModuleLoader__.load({
         h('span', { className: 'mb-mark' }, HERO_ICON),
         h('div', null,
           h('h2', null, translate('title')),
-          h('p', null, translate('intro'))))
+          h('p', null, translate('intro')),
+          h('p', { className: 'mb-hero-note' }, translate('autoSaveNote'))))
 
       const switchControl = (checked, onChange, label, disabled = false) => h('button', {
         type: 'button',
@@ -1186,21 +1249,28 @@ window.__ModuleLoader__.load({
                 onChange: (event) => updateArchivePrice(index, field, event.target.value),
               }))))),
         h('div', { className: 'mb-archive-actions' },
-          h('button', { type: 'button', className: 'mb-btn', onClick: addArchive }, translate('addArchive'))))
+          h('button', { type: 'button', className: 'mb-btn', onClick: addArchive }, translate('addArchive')),
+          archiveRows.length === 0
+            ? null
+            : h('button', {
+              type: 'button',
+              className: 'mb-btn',
+              onClick: clearArchive,
+            }, translate('clearArchive'))))
 
       const save = async () => {
         if (draft === null) return
         const payload = []
         for (const entry of draft) {
           if (entry.pricing.builtin === true) {
-            payload.push({ provider: entry.provider, model: entry.model, pricing: {} })
+            payload.push({ provider: entry.provider, model: entry.model, hidden: entry.hidden === true, pricing: {} })
             continue
           }
           const pricing = {}
           const blank = PRICE_FIELDS.every((field) => String(entry.pricing[field] ?? '').trim() === '')
           if (blank) {
             // Three blank fields mean "drop the override", so the official table applies again.
-            payload.push({ provider: entry.provider, model: entry.model, pricing: {} })
+            payload.push({ provider: entry.provider, model: entry.model, hidden: entry.hidden === true, pricing: {} })
             continue
           }
           for (const field of PRICE_FIELDS) {
@@ -1211,7 +1281,7 @@ window.__ModuleLoader__.load({
             }
             pricing[field] = parsed
           }
-          payload.push({ provider: entry.provider, model: entry.model, pricing })
+          payload.push({ provider: entry.provider, model: entry.model, hidden: entry.hidden === true, pricing })
         }
         const archivePayload = []
         const currentKeys = new Set(draft.map((entry) => `${entry.provider}\u0000${entry.model}`))
@@ -1261,6 +1331,20 @@ window.__ModuleLoader__.load({
         }
       }
 
+      // Auto-save: persist shortly after the last edit. The signature guard keeps a
+      // failed save (e.g. a half-typed price) from retrying until the user edits again.
+      const saveRef = useRef(null)
+      const attemptRef = useRef(null)
+      saveRef.current = save
+      useEffect(() => {
+        if (!dirty || saving) return undefined
+        const signature = JSON.stringify([draft, archive, displayValue])
+        if (attemptRef.current === signature) return undefined
+        attemptRef.current = signature
+        const timer = setTimeout(() => { void saveRef.current?.() }, 700)
+        return () => clearTimeout(timer)
+      }, [dirty, saving, draft, archive, display])
+
       if (snap.data === null) {
         return h(Fragment, null,
           h(Style),
@@ -1285,11 +1369,21 @@ window.__ModuleLoader__.load({
       const renderToolbar = () => h('div', { className: 'mb-bar' },
         h('span', { className: 'mb-bar-count' }, translate('modelsCount', { count: models.length })),
         h('span', { className: 'mb-spacer' }),
-        dirty ? h('span', { className: 'mb-bar-count' }, translate('unsaved')) : null,
-        h('button', { type: 'button', className: 'mb-btn', disabled: !dirty || saving, onClick: reset }, translate('undo')),
-        h('button', { type: 'button', className: 'mb-btn mb-btn-primary', disabled: !dirty || saving, onClick: () => void save() }, saving ? translate('saving') : translate('save')))
+        h('span', { className: 'mb-bar-count', role: 'status' },
+          saving ? translate('saving') : dirty ? translate('unsaved') : status?.tone === 'success' ? translate('saved') : ''))
 
       const renderModels = () => group(translate('modelsSection'), translate('modelsHint'),
+        h('div', { className: 'mb-mode-row', key: 'position-mode' },
+          h('label', { className: 'mb-mode-label', htmlFor: 'mb-position-mode' }, translate('positionModeLabel')),
+          h('select', {
+            id: 'mb-position-mode',
+            className: 'mb-select mb-mode-select',
+            value: displayValue.positionMode === 'before' ? 'before' : 'after',
+            onChange: (event) => updateDisplay({ positionMode: event.target.value }),
+          },
+            h('option', { value: 'after' }, translate('positionModeAfter')),
+            h('option', { value: 'before' }, translate('positionModeBefore')))),
+        h('p', { className: 'mb-mode-note', key: 'position-mode-note' }, translate('positionModeNote')),
         models.length === 0
           ? h('div', { className: 'mb-empty' }, translate('noModels'))
           : models.map((entry, index) => h(SettingsModelCard, {
@@ -1299,6 +1393,8 @@ window.__ModuleLoader__.load({
             count: models.length,
             translate,
             onMove: move,
+            onMoveTo: moveTo,
+            onToggleHidden: toggleHidden,
             onUpdatePrice: updatePrice,
             onResetPricing: resetPricing,
             onRestoreOfficial: restoreOfficialPricing,
@@ -1333,8 +1429,9 @@ window.__ModuleLoader__.load({
           h('p', { className: 'mb-footer-note' }, translate('formulaNote'))))
     }
 
-    function SettingsModelCard({ entry, index, count, translate, onMove, onUpdatePrice, onResetPricing, onRestoreOfficial }) {
+    function SettingsModelCard({ entry, index, count, translate, onMove, onMoveTo, onToggleHidden, onUpdatePrice, onResetPricing, onRestoreOfficial }) {
       const id = useId()
+      const moved = useRef(false)
       const pricing = entry.pricing
       const builtin = pricing.builtin === true
       const custom = entry.isDeepSeek && !builtin
@@ -1354,15 +1451,53 @@ window.__ModuleLoader__.load({
           }))
       })
 
-      return h('div', { className: 'mb-model' },
+      return h('div', { className: entry.hidden === true ? 'mb-model mb-model-hidden' : 'mb-model' },
         h('div', { className: 'mb-model-head' },
-          h('span', { className: 'mb-index' }, index + 1),
+          h('input', {
+            className: 'mb-pos-input',
+            key: `pos-${index + 1}`,
+            type: 'text',
+            inputMode: 'numeric',
+            defaultValue: String(index + 1),
+            title: translate('positionHint'),
+            'aria-label': translate('position'),
+            onChange: () => { moved.current = false },
+            onKeyDown: (event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              // Enter moves once and then blurs; the blur handler must not move again.
+              const value = Number(event.currentTarget.value)
+              if (Number.isFinite(value) && value >= 1) {
+                moved.current = true
+                onMoveTo(index, Math.round(value))
+              }
+              event.currentTarget.blur()
+            },
+            onBlur: (event) => {
+              if (moved.current) {
+                moved.current = false
+                return
+              }
+              const value = Number(event.currentTarget.value)
+              if (Number.isFinite(value) && value >= 1) onMoveTo(index, Math.round(value))
+            },
+          }),
           h('div', { style: { minWidth: 0, flex: 1 } },
             h('div', { className: 'mb-name' },
               h('span', { className: 'mb-name-text' }, entry.name),
-              entry.isDeepSeek ? h('span', { className: 'mb-tag' }, translate('deepseekTag')) : null),
+              entry.isDeepSeek ? h('span', { className: 'mb-tag' }, translate('deepseekTag')) : null,
+              entry.hidden === true ? h('span', { className: 'mb-tag' }, translate('hiddenTag')) : null),
             h('div', { className: 'mb-sub' }, `${entry.providerName} · ${entry.provider} / ${entry.model}`)),
           h('div', { className: 'mb-head-actions' },
+            h('button', {
+              type: 'button',
+              role: 'switch',
+              className: 'mb-switch mb-switch-sm',
+              'aria-checked': entry.hidden !== true ? 'true' : 'false',
+              'aria-label': entry.hidden === true ? translate('show') : translate('hide'),
+              title: translate('hiddenHint'),
+              onClick: () => onToggleHidden(index),
+            }),
             h('button', {
               type: 'button',
               className: 'mb-btn mb-btn-icon',
@@ -2010,6 +2145,21 @@ window.__ModuleLoader__.load({
       const currentEntry = current === null
         ? undefined
         : entries.find((entry) => entry.group.id === current.provider && entry.model.id === current.model)
+      // Hidden models stay configured (prices, estimates) but leave the menu. The
+      // selected route is the exception: it must remain listed so the checkmark
+      // has a row to sit on.
+      const visibleEntries = useMemo(() => {
+        const hidden = new Set()
+        for (const model of catalogModels ?? []) {
+          if (model.hidden === true) hidden.add(`${model.provider}${MODEL_KEY_SEPARATOR}${model.model}`)
+        }
+        if (hidden.size === 0) return entries
+        return entries.filter((entry) => {
+          const key = `${entry.group.id}${MODEL_KEY_SEPARATOR}${entry.model.id}`
+          if (!hidden.has(key)) return true
+          return current !== null && current?.provider === entry.group.id && current?.model === entry.model.id
+        })
+      }, [entries, catalogModels, current])
       const currentCatalog = current === null
         ? undefined
         : (catalogModels ?? []).find((model) => model.provider === current.provider && model.model === current.model)
@@ -2035,12 +2185,12 @@ window.__ModuleLoader__.load({
           })),
         ]
 
-      const showSearch = entries.length > 4
+      const showSearch = visibleEntries.length > 4
       const term = query.trim().toLowerCase()
       const filtered = useMemo(() => {
-        if (term === '') return entries
-        return entries.filter((entry) => `${entry.model.name} ${entry.group.name}`.toLowerCase().includes(term))
-      }, [entries, term])
+        if (term === '') return visibleEntries
+        return visibleEntries.filter((entry) => `${entry.model.name} ${entry.group.name}`.toLowerCase().includes(term))
+      }, [visibleEntries, term])
       // Keep the roving cursor inside the visible list; a shrunk search result
       // must not leave the index pointing past the end.
       const active = filtered.length === 0 ? -1 : Math.min(Math.max(activeIndex, 0), filtered.length - 1)

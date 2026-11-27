@@ -51,11 +51,13 @@ const DISPLAY_DEFAULTS = Object.freeze({
   fontSize: 'normal',
   density: 'comfortable',
   fontWeight: 'normal',
+  positionMode: 'after',
 })
 const DISPLAY_FLAGS = ['showTurnTail', 'showDock', 'showModels', 'showProvider', 'showCost', 'showTokens', 'showCacheHit', 'showLabels', 'showUnpricedNotice', 'takeoverPicker']
 const DISPLAY_FONT_SIZES = new Set(['small', 'normal', 'large'])
 const DISPLAY_DENSITIES = new Set(['compact', 'comfortable'])
 const DISPLAY_FONT_WEIGHTS = new Set(['normal', 'bold'])
+const DISPLAY_POSITION_MODES = new Set(['before', 'after'])
 const DEEPSEEK_PRICING_SCHEDULE = '北京时间周一至周五 9:00–12:00、14:00–18:00（法定节假日除外）'
 const DEEPSEEK_PRICES = {
   'deepseek-flash': {
@@ -222,11 +224,15 @@ async function buildCatalog(ctx, options = {}) {
   })
 
   const ranked = applySavedOrder(rows, state)
+  const hiddenKeys = new Set(state.order
+    .filter((entry) => entry.hidden === true)
+    .map((entry) => modelKey(entry.provider, entry.model)))
   return {
     ok: true,
     models: ranked.map((row, index) => ({
       ...row,
       order: index,
+      hidden: hiddenKeys.has(modelKey(row.provider, row.model)),
       pricing: catalogPricing(row.provider, row.model, state.pricing[modelKey(row.provider, row.model)]),
     })),
     failures,
@@ -253,7 +259,11 @@ function stateEnvelope(state) {
   return {
     stateVersion: STATE_VERSION,
     savedAt: state.savedAt,
-    order: state.order.map((entry) => ({ provider: entry.provider, model: entry.model })),
+    order: state.order.map((entry) => ({
+      provider: entry.provider,
+      model: entry.model,
+      ...entry.hidden === true ? { hidden: true } : {},
+    })),
     display: { ...state.display },
   }
 }
@@ -963,6 +973,7 @@ function normalizeDisplay(raw) {
   if (DISPLAY_FONT_SIZES.has(source.fontSize)) display.fontSize = source.fontSize
   if (DISPLAY_DENSITIES.has(source.density)) display.density = source.density
   if (DISPLAY_FONT_WEIGHTS.has(source.fontWeight)) display.fontWeight = source.fontWeight
+  if (DISPLAY_POSITION_MODES.has(source.positionMode)) display.positionMode = source.positionMode
   return display
 }
 
@@ -983,7 +994,7 @@ function normalizeState(raw) {
       const key = modelKey(entry.provider, entry.model)
       if (seen.has(key)) continue
       seen.add(key)
-      state.order.push({ provider: entry.provider, model: entry.model })
+      state.order.push({ provider: entry.provider, model: entry.model, ...entry.hidden === true ? { hidden: true } : {} })
     }
   }
   if (raw?.pricing !== null && typeof raw?.pricing === 'object' && !Array.isArray(raw.pricing)) {
@@ -1048,6 +1059,9 @@ async function saveOrderAndPrices(ctx, body) {
     if (!validRoute(entry?.provider, entry?.model)) {
       throw new BillingRefusal(400, 'bad-request', 'every model needs a non-empty provider and model id')
     }
+    if (entry?.hidden !== undefined && typeof entry.hidden !== 'boolean') {
+      throw new BillingRefusal(400, 'bad-request', 'hidden must be a boolean when present')
+    }
   }
   for (const entry of body?.pricingArchive ?? []) {
     if (!validRoute(entry?.provider, entry?.model)) {
@@ -1069,7 +1083,7 @@ async function saveOrderAndPrices(ctx, body) {
     if (models === null) {
       // An archive-only save must not disturb the configured order.
       for (const entry of state.order) {
-        order.push({ provider: entry.provider, model: entry.model })
+        order.push({ provider: entry.provider, model: entry.model, ...entry.hidden === true ? { hidden: true } : {} })
         seen.add(modelKey(entry.provider, entry.model))
       }
     } else {
@@ -1079,7 +1093,7 @@ async function saveOrderAndPrices(ctx, body) {
         const key = modelKey(provider, model)
         if (seen.has(key)) throw new BillingRefusal(400, 'bad-request', `duplicate model: ${provider}/${model}`)
         seen.add(key)
-        order.push({ provider, model })
+        order.push({ provider, model, ...entry.hidden === true ? { hidden: true } : {} })
         pricing[key] = publicPricing(entry.pricing)
       }
     }
@@ -1095,6 +1109,15 @@ async function saveOrderAndPrices(ctx, body) {
         // Three blank fields mean "remove this price-book entry".
         if (PRICE_FIELDS.every((field) => archived[field] === null)) delete pricing[key]
         else pricing[key] = archived
+      }
+      // A supplied archive is the whole list: anything it no longer mentions is
+      // deleted, otherwise removing a row in the UI would bounce back on reload.
+      const keep = new Set(seen)
+      for (const entry of body.pricingArchive) {
+        keep.add(modelKey(entry.provider.trim(), entry.model.trim()))
+      }
+      for (const key of Object.keys(pricing)) {
+        if (!keep.has(key)) delete pricing[key]
       }
     }
     const capped = capPricing(pricing, order, ctx)

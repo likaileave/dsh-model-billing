@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0] - 2026-11-27
+
+### 新增
+
+- 模型位次可以直接输入：设置页每个模型行左侧的序号改为输入框，填入目标位次后按回车或离开输入框即移动。新增「插入方式」下拉，可选择「排在填的位次」或「排在填的位次之后」，结果与模型原来在第几位无关；↑ / ↓ 仍可微调。
+- 模型可以隐藏：每个模型行新增隐藏开关。隐藏的模型不再出现在模型选择器中，价格与费用估算照常计算；正在使用的模型仍保留在选择器里。隐藏不会删除配置。
+- 历史价格新增「全部清空」。
+- 设置改为自动保存：停止修改后自动提交，页首标明会自动保存，不再有手动保存与撤销按钮。
+
+### 修复
+
+- 删除历史价格行后不再回弹：服务端按提交的完整清单替换历史价格，删掉的行刷新后不会重新出现。
+
+### Added
+
+- Model positions are now editable: the number at the left of each row is an input, so typing a target position and pressing Enter (or leaving the field) moves the model. A new "Insert as" choice places it at that position or one below, independent of where it came from; the arrows still nudge.
+- Models can be hidden: each row has a hide switch. Hidden models leave the model picker while prices and estimates keep counting them, and the model in use stays listed. Hiding never deletes the configuration.
+- Historical prices gained a "Clear all" action.
+- Settings save automatically: edits are submitted after you stop making them, the page says so, and the manual save and discard buttons are gone.
+
+### Fixed
+
+- Removed historical-price rows stay removed: the host replaces the stored book with the submitted list, so a deleted row no longer reappears after reloading.
+
 ## [0.4.0] - 2026-11-25
 
 ### 新增

@@ -210,6 +210,7 @@ test('normalizes turn-tail display settings and drops unknown values', () => {
     fontSize: 'normal',
     density: 'comfortable',
     fontWeight: 'normal',
+    positionMode: 'after',
   })
   assert.deepEqual(normalizeDisplay({
     showTurnTail: false,
@@ -237,6 +238,7 @@ test('normalizes turn-tail display settings and drops unknown values', () => {
     fontSize: 'normal',
     density: 'compact',
     fontWeight: 'bold',
+    positionMode: 'after',
   })
 })
 
@@ -286,6 +288,80 @@ test('persists order and prices atomically, retaining prices for later routes', 
     assert.equal(publicPricing(second.pricing[key('qwen', 'qwen3.8-flash')]).cacheMiss, 2)
     assert.equal(second.display.showModels, false)
     assert.equal(second.display.takeoverPicker, false)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('a supplied price archive replaces the stored list', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-model-billing-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = directory
+  const ctx = { logger: { warn() {} } }
+  try {
+    await saveOrderAndPrices(ctx, {
+      models: [{ provider: 'qwen', model: 'qwen3.8-max', pricing: qwenPricing }],
+      pricingArchive: [
+        { provider: 'aliyun', model: 'qwen3.8-flash', pricing: qwenPricing },
+        { provider: 'aliyun', model: 'qwen3.8-max', pricing: qwenPricing },
+      ],
+    })
+    let state = await loadState(ctx)
+    assert.equal(Object.keys(state.pricing).length, 3)
+
+    // Dropping the row from the payload must delete it, not leave it to bounce back.
+    await saveOrderAndPrices(ctx, {
+      pricingArchive: [{ provider: 'aliyun', model: 'qwen3.8-flash', pricing: qwenPricing }],
+    })
+    state = await loadState(ctx)
+    assert.deepEqual(Object.keys(state.pricing).sort(), [
+      key('aliyun', 'qwen3.8-flash'),
+      key('qwen', 'qwen3.8-max'),
+    ])
+
+    // An empty archive keeps only the configured model's own price.
+    await saveOrderAndPrices(ctx, { pricingArchive: [] })
+    state = await loadState(ctx)
+    assert.deepEqual(Object.keys(state.pricing), [key('qwen', 'qwen3.8-max')])
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('keeps hidden models configured and flags them in the envelope', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-model-billing-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = directory
+  const ctx = { logger: { warn() {} } }
+  try {
+    const envelope = await saveOrderAndPrices(ctx, {
+      models: [
+        { provider: 'qwen', model: 'qwen3.8-max', pricing: qwenPricing, hidden: true },
+        { provider: 'xiaomi', model: 'mimo-v2.6-pro', pricing: {} },
+      ],
+    })
+    assert.deepEqual(envelope.order, [
+      { provider: 'qwen', model: 'qwen3.8-max', hidden: true },
+      { provider: 'xiaomi', model: 'mimo-v2.6-pro' },
+    ])
+    const state = await loadState(ctx)
+    // Hiding must not drop the price: the route is still configured.
+    assert.equal(publicPricing(state.pricing[key('qwen', 'qwen3.8-max')]).output, 8)
+
+    // An archive-only save keeps both the flag and the position.
+    await saveOrderAndPrices(ctx, { pricingArchive: [] })
+    const after = await loadState(ctx)
+    assert.deepEqual(after.order, state.order)
+
+    // A non-boolean flag is rejected instead of being silently coerced.
+    await assert.rejects(
+      () => saveOrderAndPrices(ctx, { models: [{ provider: 'qwen', model: 'qwen3.8-max', pricing: {}, hidden: 'yes' }] }),
+      /hidden must be a boolean/,
+    )
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
